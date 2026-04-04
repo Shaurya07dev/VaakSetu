@@ -9,6 +9,10 @@ import {
 import Navbar from "@/components/Navbar";
 
 const API_BASE = "/api";
+// Long-running LLM calls go directly to backend to avoid Next.js proxy timeout
+const API_DIRECT = typeof window !== "undefined"
+  ? `http://${window.location.hostname}:8000/api`
+  : "http://localhost:8000/api";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Live Session Page
@@ -75,7 +79,7 @@ export default function SessionPage() {
     setSending(true);
 
     try {
-      const res = await fetch(`${API_BASE}/sessions/${sessionId}/message`, {
+      const res = await fetch(`${API_DIRECT}/sessions/${sessionId}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: text.trim(), input_type: "text" }),
@@ -142,7 +146,7 @@ export default function SessionPage() {
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
 
-      const res = await fetch(`${API_BASE}/transcribe`, { method: "POST", body: formData });
+      const res = await fetch(`${API_DIRECT}/transcribe`, { method: "POST", body: formData });
       if (!res.ok) throw new Error("Transcription failed");
 
       const data = await res.json();

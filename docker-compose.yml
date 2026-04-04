@@ -8,6 +8,11 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
   postgres:
     image: ankane/pgvector
@@ -21,6 +26,21 @@ services:
     volumes:
       - vaaksetu_pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+
+  # ngrok tunnel — exposes your local backend to the internet
+  # so Twilio can reach your webhooks and WebSocket endpoints.
+  # Set NGROK_AUTHTOKEN in your .env file.
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: vaaksetu_ngrok
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http host.docker.internal:8000
+    ports:
+      - "4040:4040"    # ngrok inspection UI
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   vaaksetu_pgdata:

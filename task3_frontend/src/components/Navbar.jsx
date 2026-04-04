@@ -7,6 +7,7 @@ import { useTheme } from "./ThemeProvider";
 
 const navLinks = [
   { name: "Build", href: "/build" },
+  { name: "Analysis", href: "/analysis" },
   { name: "Intelligence", href: "/healthcare" },
   { name: "Finance", href: "/banking" },
   { name: "Platform", href: "/platform" },

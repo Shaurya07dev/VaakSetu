@@ -24,6 +24,9 @@ SARVAM_STT_MODEL: str = "saaras:v3"        # Latest SOTA model
 SARVAM_STT_MODE: str = "transcribe"         # transcribe | translate | codemix
 SARVAM_CHAT_MODEL: str = "sarvam-m"         # sarvam-m | sarvam-30b | sarvam-105b
 SARVAM_CHAT_BASE_URL: str = "https://api.sarvam.ai/v1"
+
+# ── HuggingFace token for Diarization ─────────────────────────
+HF_TOKEN: str = os.getenv("HF_TOKEN", "")
 SARVAM_CHAT_TEMPERATURE: float = 0.7
 SARVAM_CHAT_MAX_TOKENS: int = 256
 

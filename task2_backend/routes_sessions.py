@@ -270,3 +270,50 @@ async def api_transcribe(audio: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Transcription failed: {e}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+_conv_processor = None
+def _get_conversation_processor():
+    global _conv_processor
+    if _conv_processor is None:
+        from task1_ai_core.conversation_processor import ConversationProcessor
+        _conv_processor = ConversationProcessor(_get_asr(), _get_agent())
+    return _conv_processor
+
+@router.post("/analyze-conversation")
+async def api_analyze_conversation(
+    agent_id: str = Form(...),
+    num_speakers: int = Form(2),
+    audio: UploadFile = File(...)
+):
+    """
+    Analyze a multi-speaker audio file.
+    Runs diarization, separation, ASR, and context extraction.
+    """
+    agent = await get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+        
+    try:
+        # Save uploaded file temporarily for pyannote and pydub to process
+        ext = Path(audio.filename or "audio.wav").suffix
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            content = await audio.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        processor = _get_conversation_processor()
+        result = await processor.process_conversation(tmp_path, agent, num_speakers)
+        
+        # Cleanup
+        Path(tmp_path).unlink(missing_ok=True)
+        
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+            
+        return {
+            "status": "ok",
+            "data": result
+        }
+    except Exception as e:
+        logger.error(f"Conversation analysis failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")

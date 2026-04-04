@@ -192,6 +192,7 @@ class ASRPipeline:
 
         if self._indicwhisper_pipe is None:
             logger.info("Loading IndicWhisper model (first time may take a few minutes)...")
+            from task1_ai_core.config import HF_TOKEN
 
             device = 0 if torch.cuda.is_available() else -1
             self._indicwhisper_pipe = hf_pipeline(
@@ -199,6 +200,7 @@ class ASRPipeline:
                 model="ai4bharat/indicwhisper-hindi",
                 device=device,
                 chunk_length_s=30,
+                token=HF_TOKEN,
             )
             logger.info(f"IndicWhisper loaded on {'GPU' if device == 0 else 'CPU'}")
 
