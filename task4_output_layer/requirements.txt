@@ -1,0 +1,74 @@
+# Web Framework
+fastapi
+uvicorn[standard]
+websockets
+python-multipart
+
+# HTTP Client
+httpx
+
+# Environment Variables
+python-dotenv
+
+# Data Validation python
+pydantic
+
+# AI / ML Libraries
+transformers
+torch
+torchaudio
+accelerate
+sentence-transformers
+
+# Sarvam AI SDK
+sarvamai
+
+# LangChain + LangGraph (Conversation Agent Framework)
+langchain-openai
+langchain-core
+langgraph
+langgraph-checkpoint-redis
+
+# Audio Processing
+pydub
+
+# NLP
+spacy
+
+# ASR / Audio
+sounddevice
+soundfile
+
+# Database
+psycopg2-binary
+pgvector
+
+# Redis
+redis
+
+# YAML Config
+PyYAML
+
+# Twilio
+twilio
+
+# OpenAI (LLM Judge)
+openai
+
+# Utilities
+numpy
+scipy
+
+# Mouriyan's AI Voice Agent - Dependencies
+# ==========================================
+
+# Core HTTP & Config
+requests>=2.31.0
+
+# Audio - TTS Playback (sounddevice already listed above)
+
+# Twilio - Outbound Calls (twilio already listed above)
+flask>=3.0.0
+
+# Simulation - Terminal UI
+colorama>=0.4.6

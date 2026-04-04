@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "timestamp": "20260403_224041",
+    "persona": {
+      "name": "Raju Sharma",
+      "language": "hinglish",
+      "mood": "frustrated",
+      "dialect": "Hinglish (Hindi + English mix)",
+      "description": "Angry bank customer tired of collection calls",
+      "turn_count": 4,
+      "escalation_level": 0
+    },
+    "total_turns": 4
+  },
+  "transcript": [
+    {
+      "role": "AI",
+      "text": "Namaste sir. Main ABC Bank se bol raha hoon. Aapka credit card payment pending hai.",
+      "turn": 1
+    },
+    {
+      "role": "Customer",
+      "text": "Phir se call? Kitni baar bolu, abhi paise nahi hai!",
+      "mood": "frustrated",
+      "escalation_level": 0,
+      "turn": 1
+    },
+    {
+      "role": "AI",
+      "text": "Sir, agar abhi payment nahi ho pa rahi, toh hum EMI freeze ya restructuring option dekh sakte hain. Kya main details batau?",
+      "turn": 2
+    },
+    {
+      "role": "Customer",
+      "text": "Arey! Maine kaha na wait karo. Kya problem hai tumhe?",
+      "mood": "frustrated",
+      "escalation_level": 0,
+      "turn": 2
+    },
+    {
+      "role": "AI",
+      "text": "Sir, aap gussa mat hoiye. Hum solution nikalne ke liye hi call kar rahe hain.",
+      "turn": 3
+    },
+    {
+      "role": "Customer",
+      "text": "Kya bakwas hai ye! EMI EMI EMI... aur kuch puchna hai?",
+      "mood": "frustrated",
+      "escalation_level": 0,
+      "turn": 3
+    },
+    {
+      "role": "AI",
+      "text": "Sir, aap gussa mat hoiye. Hum solution nikalne ke liye hi call kar rahe hain.",
+      "turn": 4
+    },
+    {
+      "role": "Customer",
+      "text": "Dekho bhai, abhi mere paas paise nahi hai. Next month dunga.",
+      "mood": "frustrated",
+      "escalation_level": 0,
+      "turn": 4
+    }
+  ]
+}

@@ -45,7 +45,7 @@ class SmartExtractor:
             self._llm = ChatOpenAI(
                 model=SARVAM_CHAT_MODEL,
                 temperature=0.1,  # Low temp for consistent extraction
-                max_tokens=512,
+                max_tokens=1024,  # Sarvam-M uses reasoning tokens
                 api_key=SARVAM_API_KEY,
                 base_url=SARVAM_CHAT_BASE_URL,
             )
@@ -110,6 +110,10 @@ If nothing is extractable, return: {{}}"""
             )
 
             content = response.content.strip()
+
+            # Strip <think>...</think> reasoning tokens from Sarvam-M
+            import re
+            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
 
             # Strip markdown code blocks if present
             if content.startswith("```"):

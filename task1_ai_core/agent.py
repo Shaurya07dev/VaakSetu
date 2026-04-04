@@ -97,7 +97,7 @@ class SmartDialogueAgent:
             self._llm = ChatOpenAI(
                 model=SARVAM_CHAT_MODEL,
                 temperature=SARVAM_CHAT_TEMPERATURE,
-                max_tokens=SARVAM_CHAT_MAX_TOKENS,
+                max_tokens=1024,  # Sarvam-M uses reasoning tokens, needs headroom
                 api_key=SARVAM_API_KEY,
                 base_url=SARVAM_CHAT_BASE_URL,
             )
@@ -211,7 +211,7 @@ class SmartDialogueAgent:
         llm = self._get_llm()
         try:
             response = await asyncio.to_thread(llm.invoke, messages)
-            agent_text = response.content
+            agent_text = self._strip_think_tags(response.content)
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
             agent_text = "Maaf kijiye, mujhe abhi thodi technical problem aa rahi hai. Kya aap dobara keh sakte hain?"
@@ -318,6 +318,13 @@ Based on the conversation so far, naturally collect the next missing field. When
         return messages
 
     # ── Helpers ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _strip_think_tags(text: str) -> str:
+        """Strip <think>...</think> reasoning tokens from Sarvam-M responses."""
+        import re
+        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+        return cleaned.strip()
 
     def _get_or_create_session(self, session_id: str, agent_config: dict) -> dict:
         """Get existing session state or create one."""
