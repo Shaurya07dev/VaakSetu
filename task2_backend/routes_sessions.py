@@ -52,6 +52,7 @@ class SendMessageRequest(BaseModel):
 _smart_agent = None
 _asr_pipeline = None
 _reward_engine = None
+_tts_pipeline = None
 
 
 def _get_agent():
@@ -81,6 +82,15 @@ def _get_reward():
     return _reward_engine
 
 
+def _get_tts():
+    """Lazy-init the TTS pipeline."""
+    global _tts_pipeline
+    if _tts_pipeline is None:
+        from task1_ai_core.tts import get_tts_pipeline
+        _tts_pipeline = get_tts_pipeline()
+    return _tts_pipeline
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Routes
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -107,11 +117,22 @@ async def api_start_session(req: StartSessionRequest):
     # Save greeting as first message
     await add_message(session_id, "assistant", greeting_response.response, turn_number=0)
 
+    # Synthesise greeting audio (non-blocking; None if Sarvam TTS unavailable)
+    greeting_audio_b64 = None
+    try:
+        lang = agent.get("default_language", "hi-IN")
+        greeting_audio_b64 = await _get_tts().synthesise_b64(
+            greeting_response.response, language_code=lang
+        )
+    except Exception as tts_err:
+        logger.warning(f"TTS failed for greeting: {tts_err}")
+
     logger.info(f"Session started: {session_id} for agent {req.agent_id}")
     return {
         "status": "ok",
         "session_id": session_id,
         "greeting": greeting_response.response,
+        "greeting_audio": greeting_audio_b64,   # base64 WAV or null
         "missing_fields": greeting_response.missing_fields,
         "agent": agent,
     }
@@ -155,6 +176,16 @@ async def api_send_message(session_id: str, req: SendMessageRequest):
         turn_count=turn,
     )
 
+    # Synthesise response audio
+    response_audio_b64 = None
+    try:
+        lang = agent.get("default_language", "hi-IN")
+        response_audio_b64 = await _get_tts().synthesise_b64(
+            response.response, language_code=lang
+        )
+    except Exception as tts_err:
+        logger.warning(f"TTS failed for turn {turn}: {tts_err}")
+
     logger.info(
         f"Session {session_id} turn {turn}: "
         f"collected={list(response.collected_fields.keys())}, "
@@ -164,6 +195,7 @@ async def api_send_message(session_id: str, req: SendMessageRequest):
     return {
         "status": "ok",
         "response": response.response,
+        "response_audio": response_audio_b64,    # base64 WAV or null
         "collected_fields": response.collected_fields,
         "missing_fields": response.missing_fields,
         "is_complete": response.is_complete,
@@ -243,6 +275,34 @@ async def api_end_session(session_id: str):
         "messages": messages,
         "reward_scores": reward_scores,
         "agent": agent,
+    }
+
+
+# ── Standalone TTS endpoint ─────────────────────────────────────────────────
+
+class TTSRequest(BaseModel):
+    text: str
+    language_code: str = "hi-IN"
+    speaker: str = "meera"
+
+
+@router.post("/tts")
+async def api_tts(req: TTSRequest):
+    """
+    Synthesise text to speech.
+    Returns base64-encoded WAV audio playable in <audio src='data:audio/wav;base64,...'>
+    """
+    audio_b64 = await _get_tts().synthesise_b64(
+        req.text, language_code=req.language_code, speaker=req.speaker
+    )
+    if audio_b64 is None:
+        raise HTTPException(status_code=503, detail="TTS unavailable — check SARVAM_API_KEY")
+    return {
+        "status": "ok",
+        "audio": audio_b64,
+        "format": "wav",
+        "language_code": req.language_code,
+        "speaker": req.speaker,
     }
 
 

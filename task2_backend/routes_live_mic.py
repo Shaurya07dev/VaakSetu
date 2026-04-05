@@ -1,9 +1,14 @@
 """
-VaakSetu — Live Microphone WebSocket Handler
+VaakSetu — Live Microphone WebSocket Handler (Rewritten)
 
-Accepts audio blobs from the browser MediaRecorder API,
-runs ASR on each chunk, feeds the LangGraph agent,
-and streams transcript + narrative updates back to the UI.
+Architecture:
+  - Browser sends transcribed TEXT (via Web Speech API) — no ASR needed server-side
+  - Optionally also receives raw audio for server-side ASR enhancement 
+  - LangGraph agent processes text chunks incrementally
+  - After "stop", triggers full final summary generation
+
+This avoids all ASR codec/format issues by using the browser's
+built-in speech recognition as the primary transcription engine.
 """
 
 import asyncio
@@ -12,15 +17,27 @@ import json
 import logging
 import tempfile
 import uuid
-from collections import defaultdict
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger("vaaksetu.live_mic")
 router = APIRouter(prefix="/api/live", tags=["Live Microphone"])
 
-# Per-session state
+# ─── Singleton processor (persisted across requests) ───────────────────────
+_processor = None
+
+
+def _get_processor():
+    global _processor
+    if _processor is None:
+        from task1_ai_core.conversation_processor import StreamConversationProcessor
+        _processor = StreamConversationProcessor()
+    return _processor
+
+
+# ─── Per-session in-memory state ────────────────────────────────────────────
 _sessions: dict[str, dict] = {}
 
 
@@ -38,31 +55,168 @@ def _get_session(session_id: str, domain: str = "healthcare") -> dict:
     return _sessions[session_id]
 
 
+# ─── Optional server-side ASR (best-effort, never crashes the session) ──────
+async def _try_server_asr(audio_bytes: bytes, audio_format: str = "webm") -> Optional[str]:
+    """
+    Try server-side ASR on raw audio bytes.
+    Returns transcript string, or None if ASR fails for any reason.
+    Never raises — all errors are caught and logged.
+    """
+    tmp_path = None
+    wav_path = None
+    try:
+        from task1_ai_core.config import SARVAM_API_KEY
+        if not SARVAM_API_KEY:
+            return None
+
+        # Write incoming bytes to temp file
+        with tempfile.NamedTemporaryFile(suffix=f".{audio_format}", delete=False) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
+
+        # Convert to 16kHz WAV using pydub (requires ffmpeg)
+        from pydub import AudioSegment
+        audio = AudioSegment.from_file(tmp_path)
+        audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
+
+        wav_path = tempfile.mktemp(suffix=".wav")
+        audio.export(wav_path, format="wav")
+
+        # Call Sarvam STT
+        from sarvamai import SarvamAI
+        client = SarvamAI(api_subscription_key=SARVAM_API_KEY)
+
+        with open(wav_path, "rb") as f:
+            resp = client.speech_to_text.transcribe(
+                file=f,
+                model="saaras:v3",
+                mode="transcribe",
+                language_code="unknown",
+            )
+
+        transcript = getattr(resp, "transcript", "") or ""
+        return transcript.strip() if transcript.strip() else None
+
+    except Exception as e:
+        logger.warning(f"Server ASR failed (non-fatal): {type(e).__name__}: {e}")
+        return None
+    finally:
+        if tmp_path:
+            Path(tmp_path).unlink(missing_ok=True)
+        if wav_path:
+            Path(wav_path).unlink(missing_ok=True)
+
+
+# ─── Full summary generation using LLM ───────────────────────────────────────
+async def _generate_final_summary(transcript_chunks: list[str], domain: str) -> dict:
+    """
+    Generate a polished final summary from the complete transcript.
+    Uses Sarvam-M LLM to produce narrative + structured data.
+    """
+    if not transcript_chunks:
+        return {"narrative": "No transcript captured.", "structured_data": {}}
+
+    full_transcript = "\n".join(
+        f"[Chunk {i+1}]: {chunk}" for i, chunk in enumerate(transcript_chunks)
+    )
+
+    domain_instructions = {
+        "healthcare": (
+            "Extract: patient_name, doctor_name, chief_complaint, symptoms (list), "
+            "diagnosis, medications (list), treatment_plan, follow_up_date, allergies."
+        ),
+        "finance": (
+            "Extract: client_name, advisor_name, investment_goal, risk_appetite, "
+            "products_discussed (list), amounts_mentioned (list), action_items (list), next_steps."
+        ),
+    }
+    extract_instruction = domain_instructions.get(domain, "Extract key entities and action items.")
+
+    prompt = f"""You are an expert medical/financial scribe. 
+Analyze the following conversation transcript and provide:
+1. A professional third-person narrative summary (3-5 sentences)
+2. Structured JSON with extracted fields
+
+Domain: {domain}
+{extract_instruction}
+
+Transcript:
+{full_transcript}
+
+Respond in this EXACT JSON format:
+{{
+  "narrative": "...",
+  "structured_data": {{
+    "field_name": "value"
+  }}
+}}"""
+
+    try:
+        from task1_ai_core.config import SARVAM_API_KEY, SARVAM_CHAT_MODEL, SARVAM_CHAT_BASE_URL
+        from openai import OpenAI
+
+        client = OpenAI(
+            api_key=SARVAM_API_KEY,
+            base_url=SARVAM_CHAT_BASE_URL,
+        )
+
+        response = await asyncio.to_thread(
+            lambda: client.chat.completions.create(
+                model=SARVAM_CHAT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=1024,
+            )
+        )
+
+        content = response.choices[0].message.content.strip()
+
+        # Extract JSON from response
+        import re
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group())
+            return {
+                "narrative": result.get("narrative", ""),
+                "structured_data": result.get("structured_data", {}),
+            }
+
+    except Exception as e:
+        logger.error(f"Final summary LLM call failed: {e}")
+
+    # Fallback: simple join
+    return {
+        "narrative": f"Conversation captured across {len(transcript_chunks)} segments. "
+                     f"Full transcript recorded for review.",
+        "structured_data": {"total_chunks": len(transcript_chunks), "domain": domain},
+    }
+
+
+# ─── WebSocket Endpoint ───────────────────────────────────────────────────────
 @router.websocket("/stream")
 async def live_mic_stream(websocket: WebSocket):
     """
-    WebSocket for live microphone streaming.
-    
-    Protocol:
-      Client → Server (JSON):
-        {"type": "start", "domain": "healthcare"}
-        {"type": "audio", "data": "<base64-wav-bytes>"}
-        {"type": "stop"}
-        
-      Server → Client (JSON):
-        {"type": "session_started", "session_id": "..."}
-        {"type": "transcript", "text": "...", "chunk_index": N}
-        {"type": "narrative", "text": "..."}
-        {"type": "structured_data", "data": {...}}
-        {"type": "speaker_map", "data": {...}}
-        {"type": "summary_complete", "transcript": [...], "narrative": "...", "structured_data": {...}}
-        {"type": "error", "message": "..."}
+    WebSocket protocol (all messages are JSON strings):
+
+    CLIENT → SERVER:
+      {"type": "start", "domain": "healthcare"}
+      {"type": "transcript_text", "text": "doctor said the patient has..."}   ← Browser STT
+      {"type": "audio_chunk", "data": "<base64>", "format": "webm"}           ← Raw audio (optional)
+      {"type": "stop"}
+
+    SERVER → CLIENT:
+      {"type": "session_started", "session_id": "..."}
+      {"type": "transcript_ack", "text": "...", "chunk_index": N}
+      {"type": "agent_update", "narrative": "...", "structured_data": {...}}
+      {"type": "processing", "message": "Generating final summary..."}
+      {"type": "summary_complete", "transcript": [...], "narrative": "...", "structured_data": {...}}
+      {"type": "error", "message": "..."}
     """
     await websocket.accept()
     session_id = f"live-{uuid.uuid4().hex[:8]}"
     session = None
-    
-    logger.info(f"Live mic WebSocket connected: {session_id}")
+
+    logger.info(f"[{session_id}] Live mic WebSocket connected")
 
     try:
         while True:
@@ -70,6 +224,7 @@ async def live_mic_stream(websocket: WebSocket):
             msg = json.loads(raw)
             msg_type = msg.get("type", "")
 
+            # ── START ──────────────────────────────────────────────
             if msg_type == "start":
                 domain = msg.get("domain", "healthcare")
                 session = _get_session(session_id, domain)
@@ -77,95 +232,119 @@ async def live_mic_stream(websocket: WebSocket):
                     "type": "session_started",
                     "session_id": session_id,
                 }))
-                logger.info(f"[{session_id}] Recording started, domain={domain}")
+                logger.info(f"[{session_id}] Session started, domain={domain}")
 
-            elif msg_type == "audio":
+            # ── TRANSCRIPT TEXT (from browser Web Speech API) ──────
+            elif msg_type == "transcript_text":
                 if not session:
                     await websocket.send_text(json.dumps({
                         "type": "error",
-                        "message": "Session not started. Send {'type': 'start'} first."
+                        "message": "Send {type: start} first.",
                     }))
                     continue
 
+                text = msg.get("text", "").strip()
+                if not text:
+                    continue
+
+                chunk_index = len(session["transcript_chunks"])
+                session["transcript_chunks"].append(text)
+
+                logger.info(f"[{session_id}] Text chunk {chunk_index}: '{text[:80]}'")
+
+                # Acknowledge immediately
+                await websocket.send_text(json.dumps({
+                    "type": "transcript_ack",
+                    "text": text,
+                    "chunk_index": chunk_index,
+                }))
+
+                # Feed into LangGraph agent (non-blocking)
+                try:
+                    processor = _get_processor()
+                    result = await processor.ingest_chunk(session_id, session["domain"], text)
+
+                    if result.get("status") == "success":
+                        session["narrative"] = result.get("narrative", "")
+                        session["structured_data"] = result.get("structured_data", {})
+                        session["speaker_map"] = result.get("speaker_map", {})
+
+                        await websocket.send_text(json.dumps({
+                            "type": "agent_update",
+                            "narrative": session["narrative"],
+                            "structured_data": session["structured_data"],
+                            "speaker_map": session["speaker_map"],
+                        }))
+                except Exception as e:
+                    logger.error(f"[{session_id}] Agent error: {e}", exc_info=True)
+
+            # ── AUDIO CHUNK (optional, for enhanced server-side ASR) ──
+            elif msg_type == "audio_chunk":
+                if not session:
+                    continue
+
                 audio_b64 = msg.get("data", "")
+                audio_fmt = msg.get("format", "webm")
                 if not audio_b64:
                     continue
 
                 audio_bytes = base64.b64decode(audio_b64)
-                chunk_index = len(session["transcript_chunks"])
 
-                # Write to temp file for ASR
-                with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
-                    tmp.write(audio_bytes)
-                    tmp_path = tmp.name
+                # Try server ASR (non-blocking, best-effort)
+                async def _process_audio():
+                    server_text = await _try_server_asr(audio_bytes, audio_fmt)
+                    if server_text:
+                        # Only add if meaningfully different from last browser transcript
+                        chunks = session.get("transcript_chunks", [])
+                        last = chunks[-1] if chunks else ""
+                        # Skip if server text is a subset of browser text
+                        if server_text.lower() not in last.lower():
+                            logger.info(f"[{session_id}] Server ASR enhanced: '{server_text[:60]}'")
+                            await websocket.send_text(json.dumps({
+                                "type": "transcript_ack",
+                                "text": f"[Enhanced] {server_text}",
+                                "chunk_index": len(chunks),
+                                "source": "server_asr",
+                            }))
 
-                try:
-                    # Run ASR
-                    from task1_ai_core.asr import ASRPipeline
-                    pipeline = ASRPipeline()
-                    result = await pipeline.transcribe(tmp_path)
-                    transcript_text = result.transcript.strip()
-                finally:
-                    Path(tmp_path).unlink(missing_ok=True)
+                asyncio.create_task(_process_audio())
 
-                if not transcript_text:
-                    logger.info(f"[{session_id}] Chunk {chunk_index}: silence/empty")
-                    continue
+            # ── STOP ────────────────────────────────────────────────
+            elif msg_type == "stop":
+                if not session:
+                    break
 
-                session["transcript_chunks"].append(transcript_text)
-                logger.info(f"[{session_id}] Chunk {chunk_index}: '{transcript_text[:60]}...'")
+                session["is_recording"] = False
+                logger.info(f"[{session_id}] Stop received. Generating final summary...")
 
-                # Send transcript update immediately
+                # Notify client we're processing
                 await websocket.send_text(json.dumps({
-                    "type": "transcript",
-                    "text": transcript_text,
-                    "chunk_index": chunk_index,
+                    "type": "processing",
+                    "message": "Generating comprehensive summary...",
                 }))
 
-                # Feed into LangGraph agent
-                try:
-                    from task1_ai_core.conversation_processor import StreamConversationProcessor
-                    processor = StreamConversationProcessor()
-                    graph_result = await processor.ingest_chunk(
-                        session_id, session["domain"], transcript_text
-                    )
+                # Generate final summary using LLM
+                summary = await _generate_final_summary(
+                    session["transcript_chunks"],
+                    session["domain"],
+                )
 
-                    if graph_result.get("status") == "success":
-                        narrative = graph_result.get("narrative", "")
-                        structured = graph_result.get("structured_data", {})
-                        speakers = graph_result.get("speaker_map", {})
+                # Update session
+                session["narrative"] = summary.get("narrative", session["narrative"])
+                session["structured_data"] = {
+                    **session.get("structured_data", {}),
+                    **summary.get("structured_data", {}),
+                }
 
-                        session["narrative"] = narrative
-                        session["structured_data"] = structured
-                        session["speaker_map"] = speakers
+                await websocket.send_text(json.dumps({
+                    "type": "summary_complete",
+                    "transcript": session["transcript_chunks"],
+                    "narrative": session["narrative"],
+                    "structured_data": session["structured_data"],
+                    "speaker_map": session["speaker_map"],
+                }))
 
-                        await websocket.send_text(json.dumps({
-                            "type": "narrative",
-                            "text": narrative,
-                        }))
-                        await websocket.send_text(json.dumps({
-                            "type": "structured_data",
-                            "data": structured,
-                        }))
-                        if speakers:
-                            await websocket.send_text(json.dumps({
-                                "type": "speaker_map",
-                                "data": speakers,
-                            }))
-                except Exception as e:
-                    logger.error(f"[{session_id}] Graph agent error: {e}")
-
-            elif msg_type == "stop":
-                logger.info(f"[{session_id}] Recording stopped by client")
-                if session:
-                    session["is_recording"] = False
-                    await websocket.send_text(json.dumps({
-                        "type": "summary_complete",
-                        "transcript": session["transcript_chunks"],
-                        "narrative": session["narrative"],
-                        "structured_data": session["structured_data"],
-                        "speaker_map": session["speaker_map"],
-                    }))
+                logger.info(f"[{session_id}] Summary sent. Session complete.")
                 break
 
     except WebSocketDisconnect:
@@ -173,6 +352,12 @@ async def live_mic_stream(websocket: WebSocket):
     except Exception as e:
         logger.error(f"[{session_id}] WebSocket error: {e}", exc_info=True)
         try:
-            await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": f"Server error: {str(e)}",
+            }))
         except Exception:
             pass
+    finally:
+        # Keep session in memory for 1 hour for potential retrieval
+        logger.info(f"[{session_id}] Connection closed")

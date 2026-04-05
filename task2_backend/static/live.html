@@ -8,790 +8,544 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #0a0e1a;
-            --bg-secondary: #111827;
-            --bg-card: #1a2235;
-            --bg-card-hover: #1f2a40;
-            --accent: #6366f1;
-            --accent-glow: rgba(99, 102, 241, 0.3);
-            --accent-2: #818cf8;
-            --success: #34d399;
-            --success-glow: rgba(52, 211, 153, 0.3);
-            --danger: #f87171;
-            --danger-glow: rgba(248, 113, 113, 0.3);
-            --warning: #fbbf24;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
-            --border: #2d3748;
-            --border-accent: rgba(99, 102, 241, 0.4);
-            --radius: 16px;
-            --radius-sm: 10px;
+            --bg: #0a0e1a; --bg2: #111827; --card: #1a2235;
+            --accent: #6366f1; --glow: rgba(99,102,241,.3);
+            --a2: #818cf8; --ok: #34d399; --ok-g: rgba(52,211,153,.3);
+            --err: #f87171; --err-g: rgba(248,113,113,.3);
+            --warn: #fbbf24; --txt: #f1f5f9; --txt2: #94a3b8; --mute: #64748b;
+            --border: #2d3748; --ba: rgba(99,102,241,.35);
+            --r: 16px; --rs: 10px;
         }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh}
+        body::before{content:'';position:fixed;inset:0;
+            background:radial-gradient(ellipse at 20% 0%,rgba(99,102,241,.08),transparent 50%),
+                        radial-gradient(ellipse at 80% 100%,rgba(52,211,153,.06),transparent 50%);
+            pointer-events:none;z-index:0}
+        .wrap{max-width:1400px;margin:0 auto;padding:24px;position:relative;z-index:1}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* ── Header ── */
+        .hdr{display:flex;align-items:center;justify-content:space-between;
+            margin-bottom:24px;padding:18px 26px;
+            background:var(--card);border:1px solid var(--border);border-radius:var(--r)}
+        .hdr-l{display:flex;align-items:center;gap:14px}
+        .logo{width:46px;height:46px;background:linear-gradient(135deg,var(--accent),#a78bfa);
+            border-radius:13px;display:flex;align-items:center;justify-content:center;
+            font-size:22px;box-shadow:0 4px 20px var(--glow)}
+        .hdr h1{font-size:21px;font-weight:700;
+            background:linear-gradient(135deg,var(--txt),var(--a2));
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .hdr p{font-size:12px;color:var(--mute);margin-top:2px}
+        .pill{padding:8px 15px;border-radius:100px;font-size:13px;font-weight:600;
+            display:flex;align-items:center;gap:8px;
+            border:1px solid var(--border);background:var(--bg2)}
+        .dot{width:10px;height:10px;border-radius:50%;background:var(--mute);transition:all .3s}
+        .dot.rec{background:var(--err);box-shadow:0 0 10px var(--err-g);animation:pulse 1.4s infinite}
+        .dot.proc{background:var(--warn);box-shadow:0 0 10px rgba(251,191,36,.4);animation:pulse 1s infinite}
+        .dot.done{background:var(--ok);box-shadow:0 0 10px var(--ok-g)}
+        @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.35)}}
 
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+        /* ── Controls ── */
+        .controls{display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+        select{padding:12px 18px;background:var(--card);border:1px solid var(--border);
+            border-radius:var(--rs);color:var(--txt);font-family:'Inter',sans-serif;
+            font-size:14px;font-weight:500;cursor:pointer;outline:none;min-width:185px;
+            transition:border-color .2s}
+        select:focus{border-color:var(--accent)}
+        select option{background:var(--bg2)}
+        .btn{padding:12px 26px;border:none;border-radius:var(--rs);
+            font-family:'Inter',sans-serif;font-size:14px;font-weight:600;
+            cursor:pointer;display:flex;align-items:center;gap:9px;
+            transition:all .25s cubic-bezier(.4,0,.2,1)}
+        .btn-go{background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;
+            box-shadow:0 4px 18px var(--glow)}
+        .btn-go:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 26px var(--glow)}
+        .btn-stop{background:linear-gradient(135deg,var(--err),#dc2626);color:#fff;
+            box-shadow:0 4px 18px var(--err-g)}
+        .btn-stop:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 26px var(--err-g)}
+        .btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+        .timer{padding:10px 18px;border-radius:var(--rs);background:var(--bg2);
+            border:1px solid var(--border);font-size:14px;font-weight:600;color:var(--mute);
+            font-variant-numeric:tabular-nums;transition:color .3s}
+        .timer.active{color:var(--err)}
 
-        /* Animated background gradient */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: 
-                radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 100%, rgba(52, 211, 153, 0.06) 0%, transparent 50%);
-            pointer-events: none;
-            z-index: 0;
-        }
+        /* ── Lang + chunk info ── */
+        .info-row{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+        .info-tag{padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600;
+            border:1px solid var(--ba);background:rgba(99,102,241,.08);color:var(--a2)}
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 24px;
-            position: relative;
-            z-index: 1;
-        }
+        /* ── Viz ── */
+        .viz-wrap{margin-bottom:20px;padding:14px 18px;background:var(--card);
+            border:1px solid var(--border);border-radius:var(--r);display:none}
+        .viz-wrap.on{display:block}
+        #viz{width:100%;height:60px;border-radius:8px}
 
-        /* Header */
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 32px;
-            padding: 20px 28px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            backdrop-filter: blur(20px);
-        }
+        /* ── Chunk progress ── */
+        .chunk-progress{display:none;align-items:center;gap:10px;padding:11px 16px;
+            background:rgba(99,102,241,.07);border:1px dashed var(--ba);
+            border-radius:var(--rs);margin-bottom:18px;font-size:13px;color:var(--a2)}
+        .chunk-progress.on{display:flex}
+        .mic-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);
+            animation:pulse .9s infinite;flex-shrink:0}
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
+        /* ── Grid ── */
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+        @media(max-width:860px){.grid{grid-template-columns:1fr}}
+        .panel{background:var(--card);border:1px solid var(--border);
+            border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+        .ph{padding:15px 20px;border-bottom:1px solid var(--border);
+            display:flex;align-items:center;justify-content:space-between}
+        .ph h2{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+        .badge{padding:3px 11px;border-radius:100px;font-size:11px;font-weight:600;
+            background:rgba(99,102,241,.1);color:var(--a2);border:1px solid rgba(99,102,241,.22)}
+        .pb{padding:16px 20px;flex:1;min-height:260px;max-height:420px;overflow-y:auto}
+        .pb::-webkit-scrollbar{width:5px}
+        .pb::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+        .full{grid-column:1/-1}
 
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--accent), #a78bfa);
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            box-shadow: 0 4px 24px var(--accent-glow);
-        }
+        /* Entries */
+        .entry{padding:11px 15px;margin-bottom:9px;background:var(--bg2);
+            border-radius:var(--rs);border-left:3px solid var(--accent);
+            font-size:14px;line-height:1.6;animation:fadeUp .3s ease-out}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+        .lbl{font-size:10px;color:var(--mute);font-weight:700;
+            text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+        .narr{font-size:14px;line-height:1.85;color:var(--txt2);white-space:pre-wrap}
+        .narr:empty::after{content:'AI summary builds here as you speak...';
+            color:var(--mute);font-style:italic}
+        .field-card{padding:11px 15px;margin-bottom:9px;background:var(--bg2);
+            border-radius:var(--rs);border:1px solid var(--border);animation:fadeUp .3s ease-out}
+        .fk{font-size:10px;color:var(--a2);font-weight:700;
+            text-transform:uppercase;letter-spacing:.55px;margin-bottom:4px}
+        .fv{font-size:14px;color:var(--txt)}
+        .empty{display:flex;flex-direction:column;align-items:center;
+            justify-content:center;height:160px;color:var(--mute);
+            font-size:14px;text-align:center;gap:8px}
+        .empty .ico{font-size:34px;opacity:.35}
+        .proc-badge{display:none;padding:9px 15px;
+            background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.28);
+            border-radius:var(--rs);color:var(--warn);font-size:13px;font-weight:600;
+            margin-bottom:14px;align-items:center;gap:8px}
+        .proc-badge.on{display:flex}
 
-        .header h1 {
-            font-size: 22px;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--text-primary), var(--accent-2));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        /* Speaker tags */
+        .stags{display:flex;gap:8px;flex-wrap:wrap}
+        .stag{padding:4px 12px;border-radius:100px;background:rgba(99,102,241,.09);
+            border:1px solid var(--ba);font-size:11px;font-weight:500;color:var(--a2)}
 
-        .header p {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .status-pill {
-            padding: 8px 16px;
-            border-radius: 100px;
-            font-size: 13px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-        }
-
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--text-muted);
-        }
-
-        .status-dot.recording {
-            background: var(--danger);
-            box-shadow: 0 0 12px var(--danger-glow);
-            animation: pulse 1.5s infinite;
-        }
-
-        .status-dot.connected {
-            background: var(--success);
-            box-shadow: 0 0 12px var(--success-glow);
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.6; transform: scale(1.3); }
-        }
-
-        /* Controls */
-        .controls {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-            margin-bottom: 28px;
-            flex-wrap: wrap;
-        }
-
-        .domain-select {
-            padding: 12px 20px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            outline: none;
-            transition: border-color 0.2s;
-            min-width: 180px;
-        }
-
-        .domain-select:focus {
-            border-color: var(--accent);
-        }
-
-        .domain-select option {
-            background: var(--bg-secondary);
-        }
-
-        .btn {
-            padding: 14px 32px;
-            border: none;
-            border-radius: var(--radius-sm);
-            font-family: 'Inter', sans-serif;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .btn-start {
-            background: linear-gradient(135deg, var(--accent), #7c3aed);
-            color: white;
-            box-shadow: 0 4px 24px var(--accent-glow);
-        }
-
-        .btn-start:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px var(--accent-glow);
-        }
-
-        .btn-stop {
-            background: linear-gradient(135deg, var(--danger), #dc2626);
-            color: white;
-            box-shadow: 0 4px 24px var(--danger-glow);
-        }
-
-        .btn-stop:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px var(--danger-glow);
-        }
-
-        .btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* Audio Visualizer */
-        .visualizer-container {
-            margin-bottom: 28px;
-            padding: 20px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            display: none;
-        }
-
-        .visualizer-container.active { display: block; }
-
-        #audioVisualizer {
-            width: 100%;
-            height: 80px;
-            border-radius: 8px;
-        }
-
-        /* Main Grid */
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
-
-        @media (max-width: 900px) {
-            .main-grid { grid-template-columns: 1fr; }
-        }
-
-        .panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .panel-header {
-            padding: 18px 24px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .panel-header h2 {
-            font-size: 16px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .panel-badge {
-            padding: 4px 12px;
-            border-radius: 100px;
-            font-size: 11px;
-            font-weight: 600;
-            background: rgba(99, 102, 241, 0.15);
-            color: var(--accent-2);
-            border: 1px solid rgba(99, 102, 241, 0.3);
-        }
-
-        .panel-body {
-            padding: 20px 24px;
-            flex: 1;
-            min-height: 300px;
-            max-height: 480px;
-            overflow-y: auto;
-        }
-
-        .panel-body::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .panel-body::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .panel-body::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 3px;
-        }
-
-        /* Transcript Entries */
-        .transcript-entry {
-            padding: 14px 18px;
-            margin-bottom: 12px;
-            background: var(--bg-secondary);
-            border-radius: var(--radius-sm);
-            border-left: 3px solid var(--accent);
-            font-size: 14px;
-            line-height: 1.6;
-            color: var(--text-primary);
-            animation: slideIn 0.3s ease-out;
-        }
-
-        .transcript-entry .chunk-label {
-            font-size: 11px;
-            color: var(--text-muted);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Narrative text */
-        .narrative-text {
-            font-size: 14px;
-            line-height: 1.8;
-            color: var(--text-secondary);
-            white-space: pre-wrap;
-        }
-
-        .narrative-text:empty::after {
-            content: 'Narrative will appear here as the conversation progresses...';
-            color: var(--text-muted);
-            font-style: italic;
-        }
-
-        /* Structured Data */
-        .structured-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .data-field {
-            padding: 14px 18px;
-            background: var(--bg-secondary);
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-        }
-
-        .data-field-key {
-            font-size: 11px;
-            color: var(--accent-2);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.6px;
-            margin-bottom: 6px;
-        }
-
-        .data-field-value {
-            font-size: 14px;
-            color: var(--text-primary);
-        }
-
-        /* Summary Section (full width) */
-        .summary-section {
-            grid-column: 1 / -1;
-        }
-
-        /* Empty state */
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 200px;
-            color: var(--text-muted);
-            font-size: 14px;
-            text-align: center;
-            gap: 10px;
-        }
-
-        .empty-state .icon {
-            font-size: 40px;
-            opacity: 0.4;
-        }
-
-        /* Timer */
-        .timer {
-            font-family: 'Inter', monospace;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-muted);
-            padding: 8px 16px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-        }
-
-        .timer.active { color: var(--danger); }
-
-        /* Toast Messages */
-        .toast {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            padding: 14px 24px;
-            background: var(--bg-card);
-            border: 1px solid var(--accent);
-            border-radius: var(--radius-sm);
-            color: var(--text-primary);
-            font-size: 14px;
-            font-weight: 500;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-            z-index: 1000;
-            animation: toastIn 0.3s ease-out;
-            display: none;
-        }
-
-        .toast.show { display: block; }
-
-        @keyframes toastIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Speaker Map */
-        .speaker-map {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .speaker-tag {
-            padding: 8px 16px;
-            background: rgba(99, 102, 241, 0.1);
-            border: 1px solid var(--border-accent);
-            border-radius: 100px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--accent-2);
-        }
+        /* Toast */
+        .toast{position:fixed;bottom:22px;right:22px;padding:12px 20px;
+            background:var(--card);border:1px solid var(--accent);border-radius:var(--rs);
+            color:var(--txt);font-size:14px;font-weight:500;
+            box-shadow:0 8px 28px rgba(0,0,0,.4);z-index:999;
+            opacity:0;pointer-events:none;transform:translateY(14px);transition:all .3s}
+        .toast.on{opacity:1;pointer-events:auto;transform:none}
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-left">
-                <div class="logo-icon">🎙️</div>
-                <div>
-                    <h1>VaakSetu — Live Call Summarisation</h1>
-                    <p>Record a real conversation. Get AI-powered insights instantly.</p>
-                </div>
-            </div>
-            <div class="status-pill" id="statusPill">
-                <span class="status-dot" id="statusDot"></span>
-                <span id="statusText">Ready</span>
-            </div>
-        </div>
+<div class="wrap">
 
-        <!-- Controls -->
-        <div class="controls">
-            <select class="domain-select" id="domainSelect">
-                <option value="healthcare">🏥 Healthcare Domain</option>
-                <option value="finance">💰 Finance Domain</option>
-            </select>
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-l">
+      <div class="logo">🎙️</div>
+      <div>
+        <h1>VaakSetu — Live Call Summarisation</h1>
+        <p>Multilingual real-time transcription via Sarvam ASR + AI summary</p>
+      </div>
+    </div>
+    <div class="pill"><span class="dot" id="dot"></span><span id="stxt">Ready</span></div>
+  </div>
 
-            <button class="btn btn-start" id="btnStart" onclick="startRecording()">
-                <span>🎤</span> Start Conversation
-            </button>
+  <!-- Controls -->
+  <div class="controls">
+    <select id="domain">
+      <option value="healthcare">🏥 Healthcare</option>
+      <option value="finance">💰 Finance</option>
+    </select>
 
-            <button class="btn btn-stop" id="btnStop" onclick="stopRecording()" disabled>
-                <span>⏹️</span> Stop & Summarise
-            </button>
+    <select id="langSel">
+      <option value="hi-IN">🇮🇳 Hindi</option>
+      <option value="en-IN">🇮🇳 English (India)</option>
+      <option value="bn-IN">Bengali</option>
+      <option value="ta-IN">Tamil</option>
+      <option value="te-IN">Telugu</option>
+      <option value="kn-IN">Kannada</option>
+      <option value="ml-IN">Malayalam</option>
+      <option value="mr-IN">Marathi</option>
+      <option value="gu-IN">Gujarati</option>
+      <option value="pa-IN">Punjabi</option>
+      <option value="od-IN">Odia</option>
+    </select>
 
-            <div class="timer" id="timer">00:00</div>
-        </div>
+    <button class="btn btn-go" id="btnStart" onclick="startSession()">🎤 Start Conversation</button>
+    <button class="btn btn-stop" id="btnStop" onclick="stopSession()" disabled>⏹️ Stop &amp; Summarise</button>
+    <div class="timer" id="tmr">00:00</div>
+  </div>
 
-        <!-- Audio Visualizer -->
-        <div class="visualizer-container" id="vizContainer">
-            <canvas id="audioVisualizer"></canvas>
-        </div>
+  <!-- Info row -->
+  <div class="info-row" id="infoRow"></div>
 
-        <!-- Main Grid -->
-        <div class="main-grid">
-            <!-- Transcript Panel -->
-            <div class="panel">
-                <div class="panel-header">
-                    <h2>📝 Live Transcript</h2>
-                    <span class="panel-badge" id="chunkCount">0 chunks</span>
-                </div>
-                <div class="panel-body" id="transcriptBody">
-                    <div class="empty-state" id="transcriptEmpty">
-                        <span class="icon">🎙️</span>
-                        <span>Start a conversation to see the live transcript</span>
-                    </div>
-                </div>
-            </div>
+  <!-- Chunk progress indicator -->
+  <div class="chunk-progress" id="chunkProg">
+    <span class="mic-dot"></span>
+    <span id="chunkMsg">Recording chunk... will transcribe in <span id="cdSec">5</span>s</span>
+  </div>
 
-            <!-- Narrative Panel -->
-            <div class="panel">
-                <div class="panel-header">
-                    <h2>📖 AI Narrative Summary</h2>
-                    <span class="panel-badge">LangGraph</span>
-                </div>
-                <div class="panel-body">
-                    <div class="narrative-text" id="narrativeText"></div>
-                </div>
-            </div>
+  <!-- Visualizer -->
+  <div class="viz-wrap" id="vizWrap"><canvas id="viz"></canvas></div>
 
-            <!-- Structured Data Panel -->
-            <div class="panel summary-section">
-                <div class="panel-header">
-                    <h2>📊 Extracted Fields</h2>
-                    <div class="speaker-map" id="speakerMap"></div>
-                </div>
-                <div class="panel-body">
-                    <div class="structured-grid" id="structuredGrid">
-                        <div class="empty-state">
-                            <span class="icon">📋</span>
-                            <span>Structured data will be extracted as the conversation progresses</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Grid -->
+  <div class="grid">
+
+    <!-- Transcript -->
+    <div class="panel">
+      <div class="ph">
+        <h2>📝 Live Transcript <span style="font-size:11px;color:var(--mute);font-weight:400">(Sarvam ASR)</span></h2>
+        <span class="badge" id="cntBadge">0 chunks</span>
+      </div>
+      <div class="pb" id="txBody">
+        <div class="empty" id="txEmpty"><span class="ico">🎙️</span><span>Start speaking to see transcript</span></div>
+      </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <!-- Narrative -->
+    <div class="panel">
+      <div class="ph">
+        <h2>📖 AI Narrative</h2>
+        <span class="badge">LangGraph</span>
+      </div>
+      <div class="pb">
+        <div class="proc-badge" id="procBadge">⏳ Generating comprehensive summary...</div>
+        <div class="narr" id="narr"></div>
+      </div>
+    </div>
 
-    <script>
-        // ── State ──
-        let ws = null;
-        let mediaRecorder = null;
-        let audioContext = null;
-        let analyser = null;
-        let animFrameId = null;
-        let timerInterval = null;
-        let startTime = null;
-        let chunkCount = 0;
+    <!-- Structured Data – full width -->
+    <div class="panel full">
+      <div class="ph">
+        <h2>📊 Extracted Fields</h2>
+        <div class="stags" id="stags"></div>
+      </div>
+      <div class="pb" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;max-height:280px" id="fieldsGrid">
+        <div class="empty" id="fieldsEmpty" style="grid-column:1/-1">
+          <span class="ico">📋</span><span>Fields extracted at end of conversation</span>
+        </div>
+      </div>
+    </div>
 
-        // ── Helpers ──
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// Config
+// ═══════════════════════════════════════════════════
+const CHUNK_INTERVAL_MS = 7000;  // Record 7-second chunks for Sarvam ASR
+const WS_URL = `ws://${location.host}/api/live/stream`;
+
+// ═══════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════
+let ws = null, mediaRecorder = null, mediaStream = null;
+let audioCtx = null, analyser = null, vizRaf = null;
+let timerIv = null, chunkIv = null, cdIv = null;
+let startTime = null, chunkCount = 0, cdSec = 0;
+
+// ═══════════════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function toast(msg, ms=3500){
+  const el=$('toast'); el.textContent=msg; el.classList.add('on');
+  setTimeout(()=>el.classList.remove('on'),ms);
+}
+
+function setStatus(txt, state=''){
+  $('stxt').textContent=txt;
+  $('dot').className='dot '+(state||'');
+  $('tmr').className='timer'+(state==='rec'?' active':'');
+}
+
+function tick(){
+  const s=Math.floor((Date.now()-startTime)/1000);
+  $('tmr').textContent=`${pad(Math.floor(s/60))}:${pad(s%60)}`;
+}
+function pad(n){return String(n).padStart(2,'0')}
+
+// ═══════════════════════════════════════════════════
+// Visualizer
+// ═══════════════════════════════════════════════════
+function startViz(stream){
+  const wrap=$('vizWrap'); wrap.classList.add('on');
+  const cv=$('viz'),ctx2=cv.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  cv.width=cv.offsetWidth*dpr; cv.height=cv.offsetHeight*dpr;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  analyser=audioCtx.createAnalyser(); analyser.fftSize=256;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  const buf=new Uint8Array(analyser.frequencyBinCount);
+  function draw(){
+    vizRaf=requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(buf);
+    ctx2.fillStyle='#1a2235'; ctx2.fillRect(0,0,cv.width,cv.height);
+    const bw=(cv.width/buf.length)*1.9; let x=0;
+    buf.forEach(v=>{
+      const h=(v/255)*cv.height*.88;
+      const g=ctx2.createLinearGradient(0,cv.height,0,cv.height-h);
+      g.addColorStop(0,'#6366f1'); g.addColorStop(1,'#a78bfa');
+      ctx2.fillStyle=g; ctx2.fillRect(x,cv.height-h,bw-1,h); x+=bw;
+    });
+  }
+  draw();
+}
+
+function stopViz(){
+  if(vizRaf)cancelAnimationFrame(vizRaf);
+  if(audioCtx)audioCtx.close().catch(()=>{});
+  $('vizWrap').classList.remove('on');
+}
+
+// ═══════════════════════════════════════════════════
+// Sarvam ASR via server
+// ═══════════════════════════════════════════════════
+async function transcribeBlob(blob, langCode){
+  const fd = new FormData();
+  // Rename to .webm so backend knows format
+  fd.append('audio', blob, 'chunk.webm');
+  try {
+    const r = await fetch('/api/transcribe', { method:'POST', body:fd });
+    if(!r.ok){
+      const err=await r.json().catch(()=>({}));
+      console.warn('ASR error:', err.detail || r.statusText);
+      return null;
+    }
+    const data = await r.json();
+    return data.transcript || null;
+  } catch(e){
+    console.error('ASR fetch failed:', e);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// WebSocket
+// ═══════════════════════════════════════════════════
+function connectWS(domain){
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => ws.send(JSON.stringify({type:'start',domain}));
+  ws.onmessage = e => handleMsg(JSON.parse(e.data));
+  ws.onerror = () => toast('⚠️ WebSocket error');
+}
+
+function handleMsg(msg){
+  if(msg.type==='session_started'){
+    toast(`✅ Session ${msg.session_id} — speak now!`);
+  } else if(msg.type==='transcript_ack'){
+    addChunk(msg.text, msg.chunk_index);
+  } else if(msg.type==='agent_update'){
+    if(msg.narrative) $('narr').textContent=msg.narrative;
+    if(msg.speaker_map) renderSpeakers(msg.speaker_map);
+  } else if(msg.type==='processing'){
+    $('procBadge').classList.add('on');
+    setStatus('Generating summary...','proc');
+    $('narr').textContent='';
+  } else if(msg.type==='summary_complete'){
+    $('procBadge').classList.remove('on');
+    setStatus('Summary ready ✓','done');
+    if(msg.narrative) $('narr').textContent=msg.narrative;
+    if(msg.structured_data) renderFields(msg.structured_data);
+    if(msg.speaker_map) renderSpeakers(msg.speaker_map);
+    toast('🎯 Summary complete! Scroll down for extracted fields.',4500);
+  } else if(msg.type==='error'){
+    toast('❌ '+msg.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// UI helpers
+// ═══════════════════════════════════════════════════
+function addChunk(text, idx){
+  $('txEmpty')?.remove();
+  const b=$('txBody');
+  const d=document.createElement('div');
+  d.className='entry';
+  d.innerHTML=`<div class="lbl">Segment ${(idx??chunkCount)+1}</div><div>${esc(text)}</div>`;
+  b.appendChild(d); b.scrollTop=b.scrollHeight;
+  chunkCount++;
+  $('cntBadge').textContent=`${chunkCount} chunk${chunkCount===1?'':'s'}`;
+}
+
+function renderFields(data){
+  const g=$('fieldsGrid');
+  if(!data||!Object.keys(data).length) return;
+  $('fieldsEmpty')?.remove();
+  for(const[k,v] of Object.entries(data)){
+    const dv=Array.isArray(v)?v.join(', '):String(v);
+    if(!dv||dv==='null'||dv==='None') continue;
+    const c=document.createElement('div'); c.className='field-card';
+    c.innerHTML=`<div class="fk">${k.replace(/_/g,' ')}</div><div class="fv">${esc(dv)}</div>`;
+    g.appendChild(c);
+  }
+}
+
+function renderSpeakers(map){
+  const c=$('stags'); c.innerHTML='';
+  for(const[s,r] of Object.entries(map)){
+    const t=document.createElement('span'); t.className='stag';
+    t.textContent=`${s} → ${r}`; c.appendChild(t);
+  }
+}
+
+function showInfo(lang, domain){
+  const r=$('infoRow'); r.innerHTML='';
+  [{label:`🌐 Language: ${lang}`},{label:`🏷️ Domain: ${domain}`},
+   {label:'🔬 ASR: Sarvam saaras:v3'},{label:'🧠 LangGraph Agent'}]
+  .forEach(({label})=>{
+    const t=document.createElement('span'); t.className='info-tag'; t.textContent=label;
+    r.appendChild(t);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// Countdown for chunk timer
+// ═══════════════════════════════════════════════════
+function startCountdown(){
+  cdSec=Math.floor(CHUNK_INTERVAL_MS/1000);
+  function tick2(){$('cdSec').textContent=cdSec; if(cdSec>0)cdSec--;}
+  tick2();
+  cdIv=setInterval(tick2,1000);
+}
+function resetCountdown(){
+  clearInterval(cdIv); startCountdown();
+}
+
+// ═══════════════════════════════════════════════════
+// MediaRecorder chunk dispatch
+// ═══════════════════════════════════════════════════
+async function onChunk(blob, langCode){
+  if(blob.size < 1000){ return; }  // skip near-silence
+  $('chunkMsg').innerHTML=`Transcribing with Sarvam ASR... <span id="cdSec">${Math.floor(CHUNK_INTERVAL_MS/1000)}</span>s`;
+
+  const text = await transcribeBlob(blob, langCode);
+
+  if(text && text.trim()){
+    // Send to WS → LangGraph
+    if(ws && ws.readyState===WebSocket.OPEN){
+      ws.send(JSON.stringify({type:'transcript_text', text: text.trim()}));
+    }
+    $('chunkMsg').innerHTML=`Next chunk in <span id="cdSec">${Math.floor(CHUNK_INTERVAL_MS/1000)}</span>s`;
+    resetCountdown();
+  } else {
+    $('chunkMsg').innerHTML=`No speech detected. Next chunk in <span id="cdSec">${Math.floor(CHUNK_INTERVAL_MS/1000)}</span>s`;
+    toast('🔇 No speech detected in last chunk');
+    resetCountdown();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Session control
+// ═══════════════════════════════════════════════════
+async function startSession(){
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({audio:true});
+  } catch(e){
+    toast('❌ Microphone access denied. Allow mic in browser settings.'); return;
+  }
+
+  const domain=$('domain').value;
+  const lang=$('langSel').value;
+
+  connectWS(domain);
+  startViz(mediaStream);
+  showInfo(lang, domain);
+
+  // --- MediaRecorder: record fixed-length chunks for Sarvam ASR ---
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus' : 'audio/webm';
+
+  mediaRecorder = new MediaRecorder(mediaStream, {mimeType});
+
+  let chunks = [];
+  mediaRecorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(chunks, {type:mimeType}); chunks=[];
+    onChunk(blob, lang);
+  };
+
+  // Start recording; stop every CHUNK_INTERVAL_MS to get a chunk
+  mediaRecorder.start();
+  chunkIv = setInterval(()=>{
+    if(mediaRecorder && mediaRecorder.state==='recording'){
+      mediaRecorder.stop();     // triggers onstop → ASR
+      mediaRecorder.start();    // immediately start next chunk
+    }
+  }, CHUNK_INTERVAL_MS);
+
+  // UI
+  $('btnStart').disabled=true; $('btnStop').disabled=false;
+  $('domain').disabled=true; $('langSel').disabled=true;
+  $('chunkProg').classList.add('on');
+  setStatus('Recording...','rec');
+  startTime=Date.now();
+  timerIv=setInterval(tick,1000);
+  startCountdown();
+  chunkCount=0;
+
+  toast('🎙️ Recording started — speak clearly in your chosen language!');
+}
+
+function stopSession(){
+  // Stop chunk timer
+  clearInterval(chunkIv);
+  clearInterval(cdIv);
+
+  // Stop recorder, collect final chunk
+  if(mediaRecorder && mediaRecorder.state!=='inactive'){
+    mediaRecorder.onstop = async () => {
+      // Transcribe final chunk first
+      const blob = new Blob(mediaRecorder._finalChunks||[], {type:'audio/webm'});
+      if(blob.size > 1000){
+        const text = await transcribeBlob(blob, $('langSel').value);
+        if(text && text.trim() && ws && ws.readyState===WebSocket.OPEN){
+          ws.send(JSON.stringify({type:'transcript_text', text:text.trim()}));
         }
-
-        function setStatus(text, state) {
-            document.getElementById('statusText').textContent = text;
-            const dot = document.getElementById('statusDot');
-            dot.className = 'status-dot ' + (state || '');
-            const timer = document.getElementById('timer');
-            timer.className = 'timer' + (state === 'recording' ? ' active' : '');
+      }
+      // Then signal stop — server generates full summary
+      setTimeout(()=>{
+        if(ws && ws.readyState===WebSocket.OPEN){
+          ws.send(JSON.stringify({type:'stop'}));
         }
+      }, 500);
+    };
+    mediaRecorder._finalChunks=[];
+    const origOnData = mediaRecorder.ondataavailable;
+    mediaRecorder.ondataavailable = e=>{
+      origOnData(e);
+      mediaRecorder._finalChunks.push(e.data);
+    };
+    mediaRecorder.stop();
+  } else {
+    // No recorder active, just send stop
+    if(ws && ws.readyState===WebSocket.OPEN){
+      ws.send(JSON.stringify({type:'stop'}));
+    }
+  }
 
-        function updateTimer() {
-            if (!startTime) return;
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
-            const s = String(elapsed % 60).padStart(2, '0');
-            document.getElementById('timer').textContent = `${m}:${s}`;
-        }
+  stopViz();
+  if(mediaStream) { mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+  clearInterval(timerIv);
 
-        function arrayBufferToBase64(buffer) {
-            const bytes = new Uint8Array(buffer);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) {
-                binary += String.fromCharCode(bytes[i]);
-            }
-            return btoa(binary);
-        }
+  $('chunkProg').classList.remove('on');
+  $('btnStart').disabled=false; $('btnStop').disabled=true;
+  $('domain').disabled=false; $('langSel').disabled=false;
 
-        // ── Audio Visualizer ──
-        function startVisualizer(stream) {
-            const container = document.getElementById('vizContainer');
-            container.classList.add('active');
-            const canvas = document.getElementById('audioVisualizer');
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth * 2;
-            canvas.height = canvas.offsetHeight * 2;
-
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            const source = audioContext.createMediaStreamSource(stream);
-            source.connect(analyser);
-
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-
-            function draw() {
-                animFrameId = requestAnimationFrame(draw);
-                analyser.getByteFrequencyData(dataArray);
-
-                ctx.fillStyle = '#1a2235';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                const barWidth = (canvas.width / bufferLength) * 2;
-                let x = 0;
-
-                for (let i = 0; i < bufferLength; i++) {
-                    const v = dataArray[i] / 255;
-                    const barHeight = v * canvas.height * 0.8;
-
-                    const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
-                    gradient.addColorStop(0, '#6366f1');
-                    gradient.addColorStop(1, '#a78bfa');
-
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
-
-                    x += barWidth;
-                }
-            }
-            draw();
-        }
-
-        function stopVisualizer() {
-            if (animFrameId) cancelAnimationFrame(animFrameId);
-            if (audioContext) audioContext.close();
-            document.getElementById('vizContainer').classList.remove('active');
-        }
-
-        // ── WebSocket ──
-        function connectWS() {
-            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${location.host}/api/live/stream`);
-
-            ws.onopen = () => {
-                const domain = document.getElementById('domainSelect').value;
-                ws.send(JSON.stringify({ type: 'start', domain }));
-            };
-
-            ws.onmessage = (event) => {
-                const msg = JSON.parse(event.data);
-
-                if (msg.type === 'session_started') {
-                    showToast(`Session ${msg.session_id} started`);
-                }
-
-                else if (msg.type === 'transcript') {
-                    addTranscriptEntry(msg.text, msg.chunk_index);
-                }
-
-                else if (msg.type === 'narrative') {
-                    document.getElementById('narrativeText').textContent = msg.text;
-                }
-
-                else if (msg.type === 'structured_data') {
-                    renderStructuredData(msg.data);
-                }
-
-                else if (msg.type === 'speaker_map') {
-                    renderSpeakerMap(msg.data);
-                }
-
-                else if (msg.type === 'summary_complete') {
-                    showToast('✅ Summary generation complete!');
-                    setStatus('Summary Ready', 'connected');
-                    document.getElementById('narrativeText').textContent = msg.narrative;
-                    renderStructuredData(msg.structured_data);
-                }
-
-                else if (msg.type === 'error') {
-                    showToast(`⚠️ ${msg.message}`);
-                }
-            };
-
-            ws.onerror = (err) => {
-                console.error('WebSocket error:', err);
-                showToast('WebSocket connection error');
-            };
-
-            ws.onclose = () => {
-                console.log('WebSocket closed');
-            };
-        }
-
-        // ── UI Updates ──
-        function addTranscriptEntry(text, index) {
-            const empty = document.getElementById('transcriptEmpty');
-            if (empty) empty.remove();
-
-            const body = document.getElementById('transcriptBody');
-            const entry = document.createElement('div');
-            entry.className = 'transcript-entry';
-            entry.innerHTML = `
-                <div class="chunk-label">Chunk ${index + 1}</div>
-                <div>${text}</div>
-            `;
-            body.appendChild(entry);
-            body.scrollTop = body.scrollHeight;
-
-            chunkCount++;
-            document.getElementById('chunkCount').textContent = `${chunkCount} chunks`;
-        }
-
-        function renderStructuredData(data) {
-            const grid = document.getElementById('structuredGrid');
-            if (!data || Object.keys(data).length === 0) return;
-
-            grid.innerHTML = '';
-            for (const [key, value] of Object.entries(data)) {
-                const displayVal = Array.isArray(value) ? value.join(', ') : String(value);
-                if (!displayVal || displayVal === 'null' || displayVal === 'None') continue;
-                const field = document.createElement('div');
-                field.className = 'data-field';
-                field.innerHTML = `
-                    <div class="data-field-key">${key.replace(/_/g, ' ')}</div>
-                    <div class="data-field-value">${displayVal}</div>
-                `;
-                grid.appendChild(field);
-            }
-        }
-
-        function renderSpeakerMap(data) {
-            const container = document.getElementById('speakerMap');
-            container.innerHTML = '';
-            for (const [speaker, role] of Object.entries(data)) {
-                const tag = document.createElement('span');
-                tag.className = 'speaker-tag';
-                tag.textContent = `${speaker} → ${role}`;
-                container.appendChild(tag);
-            }
-        }
-
-        // ── Recording ──
-        async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-                // Connect WebSocket
-                connectWS();
-
-                // Start visualizer
-                startVisualizer(stream);
-
-                // MediaRecorder — send chunks every 5 seconds
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-
-                mediaRecorder.ondataavailable = async (event) => {
-                    if (event.data.size > 0 && ws && ws.readyState === WebSocket.OPEN) {
-                        const buffer = await event.data.arrayBuffer();
-                        const b64 = arrayBufferToBase64(buffer);
-                        ws.send(JSON.stringify({ type: 'audio', data: b64 }));
-                    }
-                };
-
-                mediaRecorder.start(5000); // Emit a chunk every 5 seconds
-
-                // UI updates
-                document.getElementById('btnStart').disabled = true;
-                document.getElementById('btnStop').disabled = false;
-                document.getElementById('domainSelect').disabled = true;
-                setStatus('Recording...', 'recording');
-                startTime = Date.now();
-                timerInterval = setInterval(updateTimer, 1000);
-
-                showToast('🎙️ Recording started — speak now!');
-
-            } catch (err) {
-                console.error('Mic access error:', err);
-                showToast('❌ Could not access microphone. Please allow mic permission.');
-            }
-        }
-
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-                mediaRecorder.stream.getTracks().forEach(t => t.stop());
-            }
-
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'stop' }));
-            }
-
-            stopVisualizer();
-            clearInterval(timerInterval);
-
-            document.getElementById('btnStart').disabled = false;
-            document.getElementById('btnStop').disabled = true;
-            document.getElementById('domainSelect').disabled = false;
-            setStatus('Processing final summary...', 'connected');
-
-            showToast('⏹️ Recording stopped. Generating final summary...');
-        }
-    </script>
+  toast('⏹️ Stopped. Generating final summary...');
+}
+</script>
 </body>
 </html>
