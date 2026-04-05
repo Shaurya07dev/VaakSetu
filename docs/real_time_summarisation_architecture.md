@@ -1,119 +1,129 @@
-# Real-Time Call Summarisation Architecture
+# VaakSetu: Conversational Voice AI Platform
+**Architecture & Technical Pipeline Documentation**
 
-This document breaks down the technical architecture, design patterns, and services behind the VaakSetu Real-Time Call Summarisation framework.
+VaakSetu is an enterprise-grade, ultra-low latency, multi-modal Voice AI platform engineered specifically for the intricate linguistic landscape of India. It fluidly handles real-time telephonic integration, real-time code-switching (e.g., Hinglish, Tanglish), domain-specific data extraction, and offline multi-speaker summarisation.
+
+---
 
 ## 1. High-Level Architecture Overview
 
-VaakSetu operates as a **streaming pipeline**. Instead of waiting for a call to end and then feeding the entire transcript to a single LLM prompt (which suffers from latency and context window limitations), the system continuously ingests small audio chunks, transcribes them in near real-time, and feeds them into a stateful graph agent.
+VaakSetu operates as a real-time event-streaming duplex pipeline bridging the physical telephone network/web UI to state-of-the-art Neural conversational models.
 
 ```mermaid
 graph TD
-    subgraph Audio Acquisition
-        UI[Live Web Interface / Laptop Mic]
-        Twilio[Twilio Integration]
+    subgraph Client Acquisition Layer
+        WebUI[Next.js Dashboard & Mic]
+        PSTN[Cell Phone User]
     end
 
-    subgraph FastAPI Ingestion Layer
-        WSRoute[WebSocket Router '/api/live' or '/api/calls']
-        AudioBuffer[PCM 16kHz Buffer]
+    subgraph Transport & Telephony Layer
+        Browser[HTTPS / MediaRecorder API]
+        Twilio[Twilio Voice Engine]
+        Ngrok[Ngrok WSS Tunnel]
     end
 
-    subgraph Transcription Engine
-        ASR_S[Sarvam STT 'saaras:v3']
-        ASR_F[IndicWhisper Fallback]
+    subgraph Backend Application (FastAPI)
+        Route[REST & WebSocket Routers]
+        AudioProc[PyDub/AudioOp UpSampler]
     end
 
-    subgraph Cognitive Engine
-        LG[LangGraph State Machine]
-        DB[(Redis State Store)]
+    subgraph Deep Learning Engine
+        ASR[Sarvam STT / IndicWhisper]
+        LLM[SmartDialogueAgent / Sarvam-M]
+        EXTRACT[SmartExtractor / LangChain]
+        TTS[Sarvam TTS / Bulbul v2]
     end
 
-    UI -->|Base64 WebM Chunks| WSRoute
-    Twilio -->|mulaw 8KHz Bytes| WSRoute
+    subgraph Ancillary AI Services
+        DIAR[Pyannote Diarization]
+        RWAIF[Prometheus Reward Engine]
+    end
     
-    WSRoute -->|Raw Bytes| AudioBuffer
-    AudioBuffer -->|5s Segments| ASR_S
-    ASR_S -.->|Failure| ASR_F
-    
-    ASR_S -->|Transcript Strings| LG
-    ASR_F -->|Transcript Strings| LG
-    
-    LG <-->|Load/Save History| DB
-    LG -->|Incremental Narrative Updates| UI
+    WebUI <--> Browser
+    PSTN <--> Twilio
+    Twilio <--> Ngrok
+    Ngrok <--> Route
+    Browser <--> Route
+    Route <--> AudioProc
+    AudioProc --> ASR
+    ASR --> LLM
+    ASR --> EXTRACT
+    LLM --> TTS
+    TTS --> Route
 ```
 
 ---
 
-## 2. Audio Ingestion & Buffer Strategy
+## 2. Audio Acquisition & Processing
 
-### Why Buffer?
-Transcribing single words or 1-second chunks is computationally inefficient and leads to poor accuracy, as the STT models lose linguistic context. 
+We accept audio from two radically different acoustic environments: pristine Web audio and compressed telecom audio. Both need normalization before hitting the AI layer.
 
-### Implementation:
-We capture continuous audio but intentionally hold it in a `bytearray` or temporary file until roughly **5 seconds** of audio has accumulated. 
+### 2.1 Web UI (Next.js)
+The frontend utilizes the `MediaRecorder` API allowing the user to press to talk. The browser typically records Opus encoded audio encapsulated in `WebM` blobs. These blobs are transmitted over standard HTTP boundaries to the backend.
 
-- **Browser Audio:** Sent via `MediaRecorder` every 5,000 milliseconds.
-- **Twilio Audio:** Mulaw bytes stream continuously; we count bytes until `TWILIO_SAMPLE_RATE * 5` is reached, decode via `audioop`, upsample to 16kHz, and process.
+### 2.2 Telephony (Twilio & Ngrok)
+Live cell phone calls are integrated via Twilio Webhooks (`/api/calls/twiml`). When a PSTN connection is made, Twilio executes TwiML `<Start><Stream>` which forcefully negotiates an asymmetric WebSocket back to our local runtime over an `Ngrok WSS Tunnel`.
 
----
-
-## 3. The LangGraph State Machine (Cognitive Engine)
-
-The core intelligence is powered by **LangGraph**, which allows us to treat language model interactions like a cyclic graph where state persists between turns.
-
-### The Problem with Monolithic Architecture
-In a standard chat agent approach, generating a summary means sending `[Turn 1, Turn 2, ..., Turn N]` to an LLM. As a 20-minute call grows to hundreds of turns, token limits are exhausted, and generation time spikes to 20-30 seconds.
-
-### The LangGraph Solution
-We maintain a `ConversationState` dictionary representing the "brain" of the call. It holds a rolling window of recent transcripts, mapping extracted entities, and the running English summary. 
-
-```mermaid
-stateDiagram-v2
-    [*] --> IngestNode: Transcript Chunk Arrives
-    IngestNode --> AssignRolesNode: First few turns
-    IngestNode --> ExtractStructuredNode: Every 5 turns
-    AssignRolesNode --> ExtractStructuredNode
-    ExtractStructuredNode --> UpdateNarrativeNode: Always
-    UpdateNarrativeNode --> [*]: Return State to Ingestion Layer
-```
-
-**Node Breakdown:**
-1. **Ingest Node**: Appends the raw string securely into history and increments the `turn_count`.
-2. **Assign Roles Node**: A lightweight LLM call that looks at early dialogue and maps arbitrary tags to real-world roles (e.g., `SPEAKER_00` -> Doctor).
-3. **Extract Structured Node**: Leverages Pydantic constraints and Sarvam-M's reasoning tokens (`<think>`) to extract strict JSON parameters mapped dynamically from `./configs/*.yaml`.
-4. **Update Narrative Node**: Reads the *current* running narrative, looks at the *newly added* 5 turns of conversation, and updates the narrative to reflect the new state. This avoids reprocessing the first 10 minutes of a call when we are currently at minute 11.
+- **Topological Audio Engineering:** Telecom streams arrive internally heavily compressed as `audio/x-mulaw` bytes at 8,000Hz.
+- Using Python's native `audioop` module, the backend decodes the stream into flat 16-bit PCM tracks, and aggressively up-samples the waveform to a full 16,000Hz (required for Deep Learning audio processors) synchronously as chunk bytes arrive.
 
 ---
 
-## 4. Multi-Modal Interfaces (How we get data)
+## 3. The Core Artificial Intelligence Engine
 
-Regardless of the audio source, the backend expects the logic to normalize into standard text chunks. We support two primary ingest pipes:
+Once standard 16kHz audio arrives, we initiate parallel LLM computation.
 
-### Local React/HTML Environment
-A native JavaScript `MediaRecorder` hook captures the laptop microphone. We use WebSockets to push `audio/webm;codecs=opus` chunks directly to the backend bypassing heavy HTTP overhead.
+### 3.1 Speech-to-Text Pipeline (ASR)
+- **Primary:** Cloud-based integration with **Sarvam AI (saaras:v3)** specifically fine-tuned for dense Indian dialects and background noise handling.
+- **Fail-Over / Air-Gapped:** We enforce an automated resilience mechanism. If rate limits are exceeded, transcription seamlessly falls back to a locally executed Hugging Face endpoint running **AI4Bharat IndicWhisper**.
 
-### Twilio Telecom Media Streams
-An outbound `POST` request triggers Twilio to make a traditional cellular call. We attach a TwiML `<Start><Stream>` command that initiates a bidirectional WebSocket. The payload is `audio/x-mulaw` encoded. 
+### 3.2 Dual-Parallel Generation (`SmartDialogueAgent`)
+To drastically cut down time to first byte, when the text arrives, standard systems run extraction first, then dialogue secondly. **VaakSetu parallelizes execution using Python's `asyncio.gather`:**
 
-To bridge this to our AI models, the server performs a live topological conversion:
-```python
-# Decode mulaw to 16-bit PCM at 8kHz
-pcm_8k = audioop.ulaw2lin(mulaw_bytes, 2)
-# Upsample 8kHz -> 16kHz for ASR readiness
-pcm_16k, _ = audioop.ratecv(pcm_8k, 2, 1, 8000, 16000, None)
-```
+#### A. Conversational Loop (`ChatOpenAI` / Sarvam-M)
+The dialogue brain manages natural interaction. It continually reconstructs a highly contextual **System Prompt** dynamically loaded from our SQLite configuration database. The model is rigidly forced to be a "Live Person", adhering strictly to the user's current linguistic structure. **If the transcript is Tanglish, the LLM outputs perfect, grammatically correct Tanglish.**
+
+#### B. The Structured Extraction Engine (`SmartExtractor`)
+Whilst the model figures out how to talk back, our LangChain Node intercepts the transcript and maps user speech against Pydantic models (e.g., `HealthcareExtraction`, `FinanceExtraction`).
+- **Healthcare:** Dynamically maps *Symptoms*, *Diagnosis*, *Treatment Plan*.
+- **Finance:** Dynamically maps *Intent*, *Amount*, *Urgency*.
+- It logs retrieved datapoints silently to `collected_fields` inside the agent's memory, feeding back only "Missing Fields" to the conversational loop, ensuring the bot natively drives the user towards filling out the remaining form.
+
+### 3.3 Dynamic Text-to-Speech Output (TTS)
+Returning the LLM output to audio without sounding robotic poses a major technical hurdle involving localized linguistics. 
+
+- **Unicode Character Polling:** Traditional LLMs output Hindi in English letters (Hinglish), or Hindi natively (Devanagari). Our `tts.py` engine scans the actual returned payload character-by-character against standardized Hex Unicode blocks (`\u0900 -\u097F` for Hindi, `\u0B80-\u0BFF` for Tamil).
+- **Target Language Injection:** It automatically detects native Indic scripts and surgically overrides the LLM session global variable, setting the `target_language_code` to `kn-IN`, `ta-IN` etc., in mid-inference.
+- **Synthesizer Engine:** Driven by Sarvam's `Bulbul-v2`, it utilizes their highly fluent multi-lingual identity `Hitesh` (Male), ensuring voice persistence regardless of dialogue swapping.
+- **Browser Fallback:** The backend encodes generated 16kHz WAV tracks directly into `Base64` transmission JSON packets. If network latency fails the TTS engine, our React layout explicitly fails back asynchronously via `window.speechSynthesis` natively attached to standard browser DOM parameters.
+
+---
+
+## 4. Analytical Intelligence Services 
+
+We run supplementary engines to enrich the raw audio environments beyond just speaking to a user.
+
+### 4.1 AI Reward Engine (RLAIF)
+Instead of relying on human QC grading teams, VaakSetu deploys an integrated Reward Evaluator (`reward_engine.py`). Post-session, it leverages the `prometheus-eval/prometheus-7b-v2.0` architecture designed explicitly as a critique model.
+1. It grades **Empathy**.
+2. It grades **Task Completion**.
+3. It performs detailed **Hallucination Detection** comparing the extracted fields directly against transcription data safely housed in SQLite memory chunks.
+
+### 4.2 Local Multi-Speaker Diarization
+Conversations are rarely single-speaker. We employ an offline processing mode designed to split combined mono audio files seamlessly into segmented speaker transcripts.
+We utilize `pyannote/speaker-diarization-3.1` authenticated natively against Hugging Face. The system calculates vector shifts in the acoustic audio frame, allocating `SPEAKER_00` and `SPEAKER_01` timestamps mapping directly back up to the LangGraph extraction matrix.
 
 ---
 
 ## 5. Technology Stack Summary
 
-| Technology | Purpose | Location |
-|------------|---------|----------|
-| **FastAPI** | High-performance async API server | `task2_backend/main.py` |
-| **WebSockets** | Zero-latency duplex communication | `routes_live_mic.py`, `routes_twilio_media.py` |
-| **LangGraph** | Cyclic state execution | `task1_ai_core/graph_agent.py` |
-| **Pydantic V2** | Type-safe JSON structuring for models | `task2_backend/domain_config.py` |
-| **Sarvam AI APIs** | Foundation logic and transcription | `task1_ai_core/asr.py` |
-| **Hugging Face** | AI4Bharat IndicWhisper Fallback (`token` authed) | `task1_ai_core/asr.py` |
-
-By transitioning from REST batch-processing to **WebSocket Streaming + LangGraph Incremental Appending**, VaakSetu now scales linearly without context degradation over long calls.
+| Technology | Purpose | Utilization Layer |
+|------------|---------|-------------------|
+| **React / Next.js V15** | Control Dashboard | Control Interfaces / Client MediaRecord |
+| **FastAPI** | REST & Socket Framework | Backend Ingestion & Routing |
+| **SQLite (aiosqlite)** | Relational Engine | Configurations & RLAIF Tracking |
+| **Sarvam AI APIs** | Advanced Indic AI | ASR / LLM conversational matrix / TTS |
+| **LangGraph / LangChain** | Inference Chaining | `SmartExtractor` Contextual Execution |
+| **Twilio + ngrok** | Telephony Networking | TwiML WebHooks mapping PSTN limits |
+| **Hugging Face** | Local ML Architectures | Pyannote Diarization, Prometheus Eval |
+| **Pydantic V2** | Code Formatting | Dynamic Data Schemas for Extraction |
