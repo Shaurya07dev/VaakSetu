@@ -26,6 +26,8 @@ from task2_backend.database import (
     update_session,
     add_message,
     get_messages,
+    list_sessions,
+    delete_session,
 )
 
 logger = logging.getLogger("vaaksetu.routes.sessions")
@@ -43,6 +45,13 @@ class StartSessionRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     content: str
     input_type: str = "text"  # "text" or "voice"
+
+
+class SessionUpdateRequest(BaseModel):
+    status: Optional[str] = None
+    is_complete: Optional[bool] = None
+    collected_fields: Optional[dict] = None
+    ended_at: Optional[str] = None
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -138,6 +147,25 @@ async def api_start_session(req: StartSessionRequest):
     }
 
 
+@router.get("/sessions")
+async def api_list_sessions():
+    """List all live interaction sessions with agent and message metadata."""
+    sessions = await list_sessions()
+
+    enriched = []
+    for s in sessions:
+        agent = await get_agent(s["agent_id"])
+        messages = await get_messages(s["id"])
+        enriched.append({
+            **s,
+            "agent_name": agent["name"] if agent else "Unknown",
+            "agent_domain": agent["domain"] if agent else "Unknown",
+            "message_count": len(messages),
+        })
+
+    return {"status": "ok", "sessions": enriched}
+
+
 @router.post("/sessions/{session_id}/message")
 async def api_send_message(session_id: str, req: SendMessageRequest):
     """Send a user message and get AI response."""
@@ -220,6 +248,27 @@ async def api_get_session(session_id: str):
         "messages": messages,
         "agent": agent,
     }
+
+
+@router.put("/sessions/{session_id}")
+async def api_update_session(session_id: str, req: SessionUpdateRequest):
+    """Update editable session properties for operations dashboards."""
+    session = await get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    update_payload = req.model_dump(exclude_none=True)
+    updated = await update_session(session_id, **update_payload)
+    return {"status": "ok", "session": updated}
+
+
+@router.delete("/sessions/{session_id}")
+async def api_delete_session(session_id: str):
+    """Delete a session and all associated messages."""
+    deleted = await delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "ok", "message": "Session deleted"}
 
 
 @router.post("/sessions/{session_id}/end")

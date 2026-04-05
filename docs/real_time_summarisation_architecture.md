@@ -11,30 +11,30 @@ VaakSetu operates as a real-time event-streaming duplex pipeline bridging the ph
 
 ```mermaid
 graph TD
-    subgraph Client Acquisition Layer
+    subgraph Client_Acquisition_Layer
         WebUI[Next.js Dashboard & Mic]
         PSTN[Cell Phone User]
     end
 
-    subgraph Transport & Telephony Layer
+    subgraph Transport_Telephony_Layer
         Browser[HTTPS / MediaRecorder API]
         Twilio[Twilio Voice Engine]
         Ngrok[Ngrok WSS Tunnel]
     end
 
-    subgraph Backend Application (FastAPI)
+    subgraph Backend_Application_FastAPI
         Route[REST & WebSocket Routers]
-        AudioProc[PyDub/AudioOp UpSampler]
+        AudioProc[PyDub / AudioOp UpSampler]
     end
 
-    subgraph Deep Learning Engine
+    subgraph Deep_Learning_Engine
         ASR[Sarvam STT / IndicWhisper]
         LLM[SmartDialogueAgent / Sarvam-M]
         EXTRACT[SmartExtractor / LangChain]
         TTS[Sarvam TTS / Bulbul v2]
     end
 
-    subgraph Ancillary AI Services
+    subgraph Ancillary_AI_Services
         DIAR[Pyannote Diarization]
         RWAIF[Prometheus Reward Engine]
     end
@@ -50,7 +50,7 @@ graph TD
     ASR --> EXTRACT
     LLM --> TTS
     TTS --> Route
-```
+ ```
 
 ---
 

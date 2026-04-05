@@ -57,7 +57,7 @@ def interactive_mode(engine: SarvamTTS):
         voice_options = "/".join(VOICES.keys())
         speaker = input(f"🎙️  Voice [{voice_options}]: ").strip().lower()
         if not speaker:
-            speaker = "meera"
+            speaker = "anushka"
         if speaker not in VOICES:
             print(f"❌ Unknown voice '{speaker}'. Try: {', '.join(VOICES.keys())}")
             continue

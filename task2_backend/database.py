@@ -304,6 +304,28 @@ async def get_sessions_for_agent(agent_id: str) -> list[dict]:
         await db.close()
 
 
+async def list_sessions() -> list[dict]:
+    """List all sessions ordered by creation date (newest first)."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("SELECT * FROM sessions ORDER BY created_at DESC")
+        rows = await cursor.fetchall()
+        return [_row_to_session(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def delete_session(session_id: str) -> bool:
+    """Delete a session and all of its messages."""
+    db = await get_db()
+    try:
+        cursor = await db.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        await db.commit()
+        return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
 def _row_to_session(row) -> dict:
     """Convert a database row to a session dict."""
     return {

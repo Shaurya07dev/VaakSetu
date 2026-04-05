@@ -1,324 +1,545 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { 
-  Upload, FileAudio, Users, Loader2, CheckCircle2, 
-  AlertTriangle, Network, ListChecks, PlayCircle 
+import React, { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Database, Activity, RefreshCw, Plus, Pencil, Trash2, Eye, Loader2,
+  CheckCircle2, XCircle, Clock,
 } from "lucide-react";
-import Navbar from "@/components/Navbar";
 import { useRouter } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import AgentWizard from "@/components/AgentWizard";
 
-// Since it's a long running operation, we use API_DIRECT.
-const API_DIRECT = typeof window !== "undefined"
-  ? `http://${window.location.hostname}:8000/api`
-  : "http://localhost:8000/api";
+const API_BASE = "/api";
 
-export default function AnalysisPage() {
-  const router = useRouter();
-  const [agents, setAgents] = useState([]);
-  const [selectedAgent, setSelectedAgent] = useState(null);
-  
-  const [file, setFile] = useState(null);
-  const [numSpeakers, setNumSpeakers] = useState(2);
-  const [isDragging, setIsDragging] = useState(false);
-  
-  const [analyzing, setAnalyzing] = useState(false);
-  const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
-  
-  // Load agents
-  useEffect(() => {
-    const fetchAgents = async () => {
-      try {
-        const res = await fetch("/api/agents");
-        if (res.ok) {
-          const data = await res.json();
-          setAgents(data);
-          if (data.length > 0) setSelectedAgent(data[0].id);
-        }
-      } catch (err) {
-        console.error("Failed to load agents", err);
-      }
-    };
-    fetchAgents();
-  }, []);
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
-  };
-
-  const startAnalysis = async () => {
-    if (!file || !selectedAgent) return;
-    
-    setAnalyzing(true);
-    setError(null);
-    setResult(null);
-    
-    try {
-      const formData = new FormData();
-      formData.append("audio", file);
-      formData.append("agent_id", selectedAgent);
-      formData.append("num_speakers", numSpeakers.toString());
-      
-      const res = await fetch(`${API_DIRECT}/analyze-conversation`, {
-        method: "POST",
-        body: formData,
-      });
-      
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || "Analysis failed");
-      }
-      
-      const data = await res.json();
-      setResult(data.data);
-    } catch (err) {
-      setError(err.message || "An unexpected error occurred. Note: requires HF_TOKEN setup on backend.");
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
+function EmptyState({ title, text }) {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Navbar />
-      <div className="noise-overlay" />
-
-      <main className="flex-1 pt-24 px-6 pb-12 max-w-6xl mx-auto w-full relative z-10 flex flex-col md:flex-row gap-8">
-        
-        {/* Left Column - Form & Controls */}
-        <div className="w-full md:w-1/3 flex flex-col gap-6">
-          <div>
-            <h1 className="text-3xl font-display text-white mb-2">Voice Bifurcation</h1>
-            <p className="text-muted text-sm leading-relaxed">
-              Upload a multi-speaker audio recording. The system will separate speakers, transcribe the dialog, and generate structured insights.
-            </p>
-          </div>
-          
-          {/* Form Card */}
-          <div className="p-6 bg-white/[0.02] border border-white/10 rounded-2xl flex flex-col gap-5">
-            {/* Agent Select */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-mono text-saffron uppercase tracking-widest">Base Agent Template</label>
-              <select 
-                value={selectedAgent || ""}
-                onChange={(e) => setSelectedAgent(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-saffron/50 transition-all appearance-none"
-              >
-                {agents.map(a => (
-                  <option key={a.id} value={a.id} className="bg-[#121212]">{a.name} ({a.domain})</option>
-                ))}
-              </select>
-            </div>
-            
-            {/* Speakers Selector */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-mono text-white/50 uppercase tracking-widest flex items-center justify-between">
-                <span>Number of Speakers</span>
-                <span>{numSpeakers}</span>
-              </label>
-              <input 
-                type="range" 
-                min="2" max="5" 
-                value={numSpeakers}
-                onChange={(e) => setNumSpeakers(parseInt(e.target.value))}
-                className="accent-saffron"
-              />
-            </div>
-            
-            {/* File Upload Zone */}
-            <div 
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => document.getElementById('audio-upload')?.click()}
-              className={`mt-2 border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
-                isDragging ? "border-saffron bg-saffron/5 text-saffron" 
-                : file ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-500"
-                : "border-white/10 hover:border-white/20 text-muted"
-              }`}
-            >
-              <input 
-                type="file" 
-                id="audio-upload" 
-                className="hidden" 
-                accept="audio/*" 
-                onChange={handleFileChange}
-              />
-              {file ? (
-                <>
-                  <FileAudio size={32} className="mb-3" />
-                  <p className="text-sm font-medium text-white">{file.name}</p>
-                  <p className="text-xs opacity-70 mt-1">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                </>
-              ) : (
-                <>
-                  <Upload size={32} className="mb-3 opacity-50" />
-                  <p className="text-sm">Drag audio file here or <span className="text-saffron">browse</span></p>
-                  <p className="text-xs opacity-50 mt-1">WAV, MP3, M4A supported</p>
-                </>
-              )}
-            </div>
-            
-            <button 
-              onClick={startAnalysis}
-              disabled={!file || !selectedAgent || analyzing}
-              className="btn-primary w-full py-4 rounded-xl flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
-            >
-              {analyzing ? (
-                <><Loader2 size={16} className="animate-spin" /> Abstracting Insights...</>
-              ) : (
-                <><Network size={16} /> Analyze Conversation</>
-              )}
-            </button>
-            
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex gap-2 text-red-400">
-                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                <p className="text-xs leading-relaxed">{error}</p>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Right Column - Results */}
-        <div className="w-full md:w-2/3 flex flex-col h-[calc(100vh-8rem)]">
-          {!result && !analyzing ? (
-            <div className="flex-1 border border-white/5 bg-white/[0.01] rounded-2xl flex flex-col items-center justify-center text-center p-12 overflow-hidden relative">
-              <div className="absolute inset-0 bg-saffron/5 blur-3xl rounded-full opacity-20 scale-150 -z-10" />
-              <Network size={64} strokeWidth={1} className="text-white/10 mb-6" />
-              <h3 className="text-xl text-white/50 font-display">Awaiting Audio Processing</h3>
-              <p className="text-muted/50 text-sm mt-3 max-w-sm">
-                Upload a conversation to see AI-generated diarization, full transcriptions, and structured metadata extraction.
-              </p>
-            </div>
-          ) : analyzing ? (
-            <div className="flex-1 border border-white/5 bg-white/[0.01] rounded-2xl flex flex-col items-center justify-center text-center p-12">
-              <Loader2 size={48} className="text-saffron animate-spin mb-6" />
-              <h3 className="text-xl text-white font-display mb-2">Analyzing Audio Signals...</h3>
-              <p className="text-muted text-sm max-w-sm">
-                This process involves Speaker Diarization, localized transcribing via Sarvam STT, and contextual LLM extraction. This may take a minute.
-              </p>
-              
-              <div className="w-64 bg-white/5 rounded-full h-1 mt-8 overflow-hidden">
-                <div className="h-full bg-saffron w-1/3 animate-pulse rounded-full" />
-              </div>
-            </div>
-          ) : (
-            <motion.div 
-              initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}}
-              className="flex-1 flex flex-col min-h-0"
-            >
-              {/* Insight Cards Overview */}
-              <div className="grid grid-cols-2 gap-4 mb-6 shrink-0">
-                <div className="bg-gradient-to-br from-saffron/20 to-saffron/5 border border-saffron/20 rounded-2xl p-5">
-                  <h4 className="text-xs font-mono text-saffron uppercase tracking-widest mb-1 flex items-center gap-2">
-                    <ListChecks size={14} /> AI Summary
-                  </h4>
-                  <p className="text-white text-sm leading-relaxed mt-3">{result.summary}</p>
-                </div>
-                
-                <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 flex flex-col">
-                  <h4 className="text-xs font-mono text-white/50 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <CheckCircle2 size={14} /> Extracted Data
-                  </h4>
-                  <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                    {Object.keys(result.analysis || {}).length === 0 ? (
-                      <span className="text-muted text-xs italic">No relevant configuration fields matched.</span>
-                    ) : null}
-                    {Object.entries(result.analysis || {}).map(([key, val]) => (
-                      <div key={key} className="flex justify-between items-start border-b border-white/5 pb-2">
-                        <span className="text-xs text-muted">{key}</span>
-                        <span className="text-xs text-white max-w-[60%] text-right font-medium">{String(val)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Diarization Timeline */}
-              <div className="flex-1 bg-white/[0.02] border border-white/10 rounded-2xl overflow-y-auto p-6 scrollbar-thin flex flex-col min-h-0">
-                <h4 className="text-xs font-mono text-white/50 uppercase tracking-widest mb-6 sticky top-0 bg-[#0A0A0A] pb-2 z-10 border-b border-white/5">
-                  Transcription Timeline
-                </h4>
-                
-                <div className="space-y-6">
-                  {result.segments?.map((seg, idx) => (
-                    <div key={idx} className="flex gap-4">
-                      {/* Timeline graphic */}
-                      <div className="flex flex-col items-center shrink-0">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border ${strToColorProps(seg.speaker)}`}>
-                          {seg.speaker.replace("SPEAKER_", "S")}
-                        </div>
-                        {idx !== result.segments.length - 1 && (
-                          <div className="w-px h-full bg-white/5 mt-2 min-h-[1.5rem]" />
-                        )}
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="flex-1 pb-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-white">{seg.speaker}</span>
-                          <span className="text-[10px] text-muted font-mono">{formatTime(seg.start)} - {formatTime(seg.end)}</span>
-                        </div>
-                        <p className="text-sm text-white/80 leading-relaxed bg-white/[0.02] inline-block px-4 py-2 rounded-xl mt-1">
-                          {seg.transcript}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {(!result.segments || result.segments.length === 0) && (
-                    <div className="text-center py-8 text-muted text-sm">
-                      No voices detected in the audio.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </main>
+    <div className="text-center py-10">
+      <p className="text-sm text-white/80 font-medium">{title}</p>
+      <p className="text-xs text-muted mt-2">{text}</p>
     </div>
   );
 }
 
-// Helpers
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
+function IconBtn({ title, onClick, children, tone = "default", disabled = false }) {
+  const toneClass = tone === "danger"
+    ? "text-muted hover:text-red-400 hover:bg-red-400/10"
+    : "text-muted hover:text-saffron hover:bg-saffron/10";
+
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-8 h-8 rounded-full bg-white/5 flex items-center justify-center transition-all disabled:opacity-40 ${toneClass}`}
+    >
+      {children}
+    </button>
+  );
 }
 
-// Generate consistent colors for different speakers
-function strToColorProps(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  const colors = [
-    "bg-blue-500/10 border-blue-500/30 text-blue-400",
-    "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
-    "bg-purple-500/10 border-purple-500/30 text-purple-400",
-    "bg-orange-500/10 border-orange-500/30 text-orange-400",
-    "bg-pink-500/10 border-pink-500/30 text-pink-400",
-  ];
-  return colors[Math.abs(hash) % colors.length];
+function SessionEditorModal({ open, session, onClose, onSave }) {
+  const [status, setStatus] = useState("active");
+  const [isComplete, setIsComplete] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!session) return;
+    setStatus(session.status || "active");
+    setIsComplete(Boolean(session.is_complete));
+  }, [session]);
+
+  const handleSave = async () => {
+    if (!session) return;
+    setSaving(true);
+    await onSave(session.id, { status, is_complete: isComplete });
+    setSaving(false);
+    onClose();
+  };
+
+  if (!open || !session) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-[#0e0e0e] border border-white/10 rounded-3xl p-6">
+        <h3 className="text-xl font-display text-white mb-1">Edit Live Session</h3>
+        <p className="text-xs text-muted font-mono mb-6">{session.id}</p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-mono text-muted uppercase tracking-widest block mb-2">
+              Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-saffron/50"
+            >
+              <option className="bg-[#121212]" value="active">active</option>
+              <option className="bg-[#121212]" value="completed">completed</option>
+              <option className="bg-[#121212]" value="paused">paused</option>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-3 text-sm text-white">
+            <input
+              type="checkbox"
+              checked={isComplete}
+              onChange={(e) => setIsComplete(e.target.checked)}
+              className="accent-saffron"
+            />
+            Mark as complete
+          </label>
+        </div>
+
+        <div className="flex justify-end gap-3 mt-8">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-full border border-white/10 text-sm hover:bg-white/5 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-primary px-5 py-2.5 rounded-full text-sm disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SessionCreateModal({ open, agents, onClose, onCreate }) {
+  const [agentId, setAgentId] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (agents.length > 0) setAgentId(agents[0].id);
+  }, [agents]);
+
+  const create = async () => {
+    if (!agentId) return;
+    setCreating(true);
+    await onCreate(agentId);
+    setCreating(false);
+    onClose();
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
+      <div className="w-full max-w-md bg-[#0e0e0e] border border-white/10 rounded-3xl p-6">
+        <h3 className="text-xl font-display text-white mb-1">Create Live Session</h3>
+        <p className="text-xs text-muted font-mono mb-6">Select base agent template</p>
+
+        <select
+          value={agentId}
+          onChange={(e) => setAgentId(e.target.value)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-saffron/50"
+        >
+          {agents.map((a) => (
+            <option key={a.id} className="bg-[#121212]" value={a.id}>
+              {a.name} ({a.domain})
+            </option>
+          ))}
+        </select>
+
+        <div className="flex justify-end gap-3 mt-8">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-full border border-white/10 text-sm hover:bg-white/5 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={create}
+            disabled={!agentId || creating}
+            className="btn-primary px-5 py-2.5 rounded-full text-sm disabled:opacity-50"
+          >
+            {creating ? "Creating..." : "Create"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AnalysisPage() {
+  const router = useRouter();
+
+  const [agents, setAgents] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const [showAgentWizard, setShowAgentWizard] = useState(false);
+  const [editingAgent, setEditingAgent] = useState(null);
+
+  const [showSessionEditor, setShowSessionEditor] = useState(false);
+  const [editingSession, setEditingSession] = useState(null);
+
+  const [showSessionCreator, setShowSessionCreator] = useState(false);
+
+  const activeSessions = useMemo(
+    () => sessions.filter((s) => s.status === "active").length,
+    [sessions]
+  );
+  const completedSessions = useMemo(
+    () => sessions.filter((s) => s.status === "completed").length,
+    [sessions]
+  );
+
+  const fetchAll = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [agentRes, sessionRes] = await Promise.all([
+        fetch(`${API_BASE}/agents`),
+        fetch(`${API_BASE}/sessions`),
+      ]);
+
+      if (!agentRes.ok || !sessionRes.ok) {
+        throw new Error("Failed to fetch dashboard data from backend.");
+      }
+
+      const agentData = await agentRes.json();
+      const sessionData = await sessionRes.json();
+
+      setAgents(agentData.agents || []);
+      setSessions(sessionData.sessions || []);
+    } catch (err) {
+      setError(err.message || "Unknown error while loading data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAll();
+  }, []);
+
+  const handleSaveAgent = async (agentData) => {
+    setBusy(true);
+    try {
+      if (editingAgent?.id) {
+        const res = await fetch(`${API_BASE}/agents/${editingAgent.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(agentData),
+        });
+        if (!res.ok) throw new Error("Failed to update agent.");
+      } else {
+        const res = await fetch(`${API_BASE}/agents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(agentData),
+        });
+        if (!res.ok) throw new Error("Failed to create agent.");
+      }
+      await fetchAll();
+      setShowAgentWizard(false);
+      setEditingAgent(null);
+    } catch (err) {
+      setError(err.message || "Agent save failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteAgent = async (agentId) => {
+    if (!window.confirm("Delete this agent? Sessions under this agent may be affected.")) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/agents/${agentId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete agent.");
+      await fetchAll();
+    } catch (err) {
+      setError(err.message || "Agent delete failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCreateSession = async (agentId) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent_id: agentId }),
+      });
+      if (!res.ok) throw new Error("Failed to create session.");
+      await fetchAll();
+    } catch (err) {
+      setError(err.message || "Session create failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUpdateSession = async (sessionId, payload) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to update session.");
+      await fetchAll();
+    } catch (err) {
+      setError(err.message || "Session update failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId) => {
+    if (!window.confirm("Delete this session and its messages?")) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/sessions/${sessionId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete session.");
+      await fetchAll();
+    } catch (err) {
+      setError(err.message || "Session delete failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <div className="noise-overlay" />
+
+      <main className="pt-28 pb-24 px-6 max-w-7xl mx-auto relative z-10 space-y-8">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-display text-white mb-2">
+              Analysis <span className="italic opacity-60">— Data Operations</span>
+            </h1>
+            <p className="text-muted text-sm max-w-3xl">
+              Unified operational view for Agent definitions and Live Interaction sessions with in-place CRUD actions.
+            </p>
+          </div>
+
+          <button
+            onClick={fetchAll}
+            disabled={loading || busy}
+            className="px-5 py-3 rounded-full border border-white/10 text-sm hover:bg-white/5 transition-all flex items-center gap-2 disabled:opacity-40"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-red-300 text-sm">
+            {error}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+            <p className="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Agents</p>
+            <p className="text-3xl font-display text-saffron">{agents.length}</p>
+          </div>
+          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+            <p className="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Live Sessions</p>
+            <p className="text-3xl font-display text-cyan-vivid">{sessions.length}</p>
+          </div>
+          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+            <p className="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Active</p>
+            <p className="text-3xl font-display text-emerald-500">{activeSessions}</p>
+          </div>
+          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+            <p className="text-[10px] font-mono text-muted uppercase tracking-widest mb-1">Completed</p>
+            <p className="text-3xl font-display text-white">{completedSessions}</p>
+          </div>
+        </div>
+
+        <div className="grid xl:grid-cols-2 gap-8">
+          <motion.section
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/[0.02] border border-white/10 rounded-3xl p-6"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-saffron/10 border border-saffron/20 flex items-center justify-center">
+                  <Database size={16} className="text-saffron" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-display text-white">Agents Database</h2>
+                  <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Create / Read / Update / Delete</p>
+                </div>
+              </div>
+
+              <IconBtn
+                title="Create Agent"
+                onClick={() => {
+                  setEditingAgent(null);
+                  setShowAgentWizard(true);
+                }}
+              >
+                <Plus size={14} />
+              </IconBtn>
+            </div>
+
+            {loading ? (
+              <div className="py-10 flex justify-center"><Loader2 size={24} className="animate-spin text-saffron" /></div>
+            ) : agents.length === 0 ? (
+              <EmptyState title="No agents found" text="Create an agent from the + icon." />
+            ) : (
+              <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+                {agents.map((agent) => (
+                  <div key={agent.id} className="bg-white/[0.02] border border-white/8 rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-white text-sm font-medium">{agent.name}</p>
+                        <p className="text-[10px] text-muted font-mono mt-1">
+                          {agent.id} • {agent.domain}
+                        </p>
+                        <p className="text-[10px] text-muted mt-2">
+                          Fields: {(agent.fields || []).length} • Inputs: {(agent.inputs || []).join(", ")}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <IconBtn title="Read / Open Session" onClick={() => router.push(`/session/${agent.id}`)}>
+                          <Eye size={14} />
+                        </IconBtn>
+                        <IconBtn title="Update Agent" onClick={() => { setEditingAgent(agent); setShowAgentWizard(true); }}>
+                          <Pencil size={14} />
+                        </IconBtn>
+                        <IconBtn title="Delete Agent" tone="danger" onClick={() => handleDeleteAgent(agent.id)}>
+                          <Trash2 size={14} />
+                        </IconBtn>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.section>
+
+          <motion.section
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            className="bg-white/[0.02] border border-white/10 rounded-3xl p-6"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-vivid/10 border border-cyan-vivid/20 flex items-center justify-center">
+                  <Activity size={16} className="text-cyan-vivid" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-display text-white">Live Interaction Sessions</h2>
+                  <p className="text-[10px] font-mono text-muted uppercase tracking-widest">Create / Read / Update / Delete</p>
+                </div>
+              </div>
+
+              <IconBtn title="Create Session" onClick={() => setShowSessionCreator(true)} disabled={agents.length === 0}>
+                <Plus size={14} />
+              </IconBtn>
+            </div>
+
+            {loading ? (
+              <div className="py-10 flex justify-center"><Loader2 size={24} className="animate-spin text-saffron" /></div>
+            ) : sessions.length === 0 ? (
+              <EmptyState title="No sessions found" text="Create a live session from the + icon." />
+            ) : (
+              <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+                {sessions.map((session) => (
+                  <div key={session.id} className="bg-white/[0.02] border border-white/8 rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-white text-sm font-medium">{session.agent_name}</p>
+                        <p className="text-[10px] text-muted font-mono mt-1">
+                          {session.id} • {session.agent_domain}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2 text-[10px] font-mono">
+                          <span className="text-muted inline-flex items-center gap-1">
+                            <Clock size={11} /> {session.turn_count || 0} turns
+                          </span>
+                          <span className="text-muted">
+                            {session.message_count || 0} messages
+                          </span>
+                          <span className={`inline-flex items-center gap-1 ${
+                            session.is_complete ? "text-emerald-500" : "text-saffron"
+                          }`}>
+                            {session.is_complete ? <CheckCircle2 size={11} /> : <XCircle size={11} />}
+                            {session.is_complete ? "complete" : "incomplete"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <IconBtn
+                          title="Read / View Stats"
+                          onClick={() => router.push(`/session/${session.agent_id}/stats?sid=${session.id}`)}
+                        >
+                          <Eye size={14} />
+                        </IconBtn>
+                        <IconBtn
+                          title="Update Session"
+                          onClick={() => {
+                            setEditingSession(session);
+                            setShowSessionEditor(true);
+                          }}
+                        >
+                          <Pencil size={14} />
+                        </IconBtn>
+                        <IconBtn
+                          title="Delete Session"
+                          tone="danger"
+                          onClick={() => handleDeleteSession(session.id)}
+                        >
+                          <Trash2 size={14} />
+                        </IconBtn>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.section>
+        </div>
+      </main>
+
+      <AnimatePresence>
+        {showAgentWizard && (
+          <AgentWizard
+            onClose={() => {
+              setShowAgentWizard(false);
+              setEditingAgent(null);
+            }}
+            onSave={handleSaveAgent}
+            initialData={editingAgent}
+          />
+        )}
+      </AnimatePresence>
+
+      <SessionEditorModal
+        open={showSessionEditor}
+        session={editingSession}
+        onClose={() => {
+          setShowSessionEditor(false);
+          setEditingSession(null);
+        }}
+        onSave={handleUpdateSession}
+      />
+
+      <SessionCreateModal
+        open={showSessionCreator}
+        agents={agents}
+        onClose={() => setShowSessionCreator(false)}
+        onCreate={handleCreateSession}
+      />
+    </div>
+  );
 }
