@@ -493,7 +493,7 @@ export default function SessionPage() {
             >
               <Volume2 size={15} className="text-saffron flex-shrink-0" />
               <span className="text-xs text-saffron/80 font-mono">
-                🔊 Click here to enable voice — agent will speak its responses aloud
+                Click here to enable voice — agent will speak its responses aloud
               </span>
             </motion.div>
           )}
