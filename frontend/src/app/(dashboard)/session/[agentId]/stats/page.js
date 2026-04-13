@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { 
   ArrowLeft, CheckCircle2, XCircle, Clock, MessageSquare, 
   BarChart3, Shield, Smile, Languages, Scale, Loader2,
-  FileJson, TrendingUp
+  FileJson, TrendingUp, Download
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
@@ -68,6 +68,7 @@ export default function StatsPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   useEffect(() => {
     if (sessionId) loadStats();
@@ -124,6 +125,100 @@ export default function StatsPage() {
   const totalMessages = messages?.length || 0;
   const userMessages = messages?.filter(m => m.role === "user").length || 0;
   const agentMessages = messages?.filter(m => m.role === "assistant").length || 0;
+
+  const downloadSessionPdf = async () => {
+    if (!data || !sessionId) return;
+    setDownloadingPdf(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 48;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      const ensureSpace = (needed = 24) => {
+        if (y + needed > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+      };
+
+      const addTitle = (text) => {
+        ensureSpace(36);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(20);
+        doc.text(text, margin, y);
+        y += 26;
+      };
+
+      const addSection = (title) => {
+        ensureSpace(28);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.text(title, margin, y);
+        y += 16;
+      };
+
+      const addLine = (text, size = 10) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(size);
+        const lines = doc.splitTextToSize(text, contentWidth);
+        ensureSpace(lines.length * (size + 4) + 6);
+        doc.text(lines, margin, y);
+        y += lines.length * (size + 4) + 4;
+      };
+
+      addTitle("VaakSetu Session Report");
+      addLine(`Generated: ${new Date().toISOString()}`);
+      addLine(`Session ID: ${session.id}`);
+      addLine(`Agent: ${agent?.name || "Unknown"} (${agent?.domain || "Unknown"})`);
+      addLine(`Status: ${session?.status || "unknown"} | Complete: ${session?.is_complete ? "Yes" : "No"} | Turns: ${session?.turn_count || 0}`);
+      addLine(`Messages: ${totalMessages} (User: ${userMessages}, Agent: ${agentMessages})`);
+
+      addSection("Structured Fields");
+      const collectedEntries = Object.entries(collected || {});
+      if (collectedEntries.length === 0) {
+        addLine("No structured fields collected.");
+      } else {
+        for (const [key, value] of collectedEntries) {
+          addLine(`- ${key}: ${String(value)}`);
+        }
+      }
+
+      addSection("Quality Scores");
+      if (scores?.combined_reward != null) {
+        addLine(`Combined Reward: ${scores.combined_reward}`);
+        addLine(`DPO Label: ${scores.dpo_label || "n/a"}`);
+      } else {
+        addLine("No reward score available.");
+      }
+      if (programmatic) {
+        addLine(`Programmatic - turn_efficiency=${programmatic.turn_efficiency}, sentiment_delta=${programmatic.sentiment_delta}, resolution_rate=${programmatic.resolution_rate}, content_safety=${programmatic.content_safety}`);
+      }
+      if (llmJudge) {
+        addLine(`LLM Judge - politeness=${llmJudge.politeness}/5, accuracy=${llmJudge.accuracy}/5, indic_fluency=${llmJudge.indic_fluency}/5, policy_compliance=${llmJudge.policy_compliance}/5, resolution_quality=${llmJudge.resolution_quality}/5`);
+        if (llmJudge.feedback) addLine(`Feedback: ${llmJudge.feedback}`);
+      }
+
+      addSection("Conversation Transcript");
+      if (!messages?.length) {
+        addLine("No transcript available.");
+      } else {
+        for (const msg of messages) {
+          const roleLabel = msg.role === "user" ? "User" : (agent?.name || "Agent");
+          addLine(`[Turn ${msg.turn_number}] ${roleLabel}: ${msg.content}`);
+        }
+      }
+
+      doc.save(`vaaksetu_session_${sessionId}.pdf`);
+    } catch (e) {
+      setError(`PDF export failed: ${e.message}`);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -253,6 +348,14 @@ export default function StatsPage() {
         <div className="flex justify-center gap-6 mt-12">
           <button onClick={() => router.push("/build")} className="px-8 py-4 border border-white/10 rounded-full text-sm hover:bg-white/5 transition-all">
             Back to Agents
+          </button>
+          <button
+            onClick={downloadSessionPdf}
+            disabled={downloadingPdf}
+            className="px-8 py-4 border border-saffron/30 text-saffron rounded-full text-sm hover:bg-saffron/10 transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {downloadingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            {downloadingPdf ? "Preparing PDF..." : "Download PDF"}
           </button>
           <button onClick={() => router.push(`/session/${agentId}`)} className="btn-primary px-8 py-4 rounded-full text-sm">
             Start New Session

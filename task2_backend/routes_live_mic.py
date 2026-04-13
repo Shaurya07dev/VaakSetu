@@ -19,11 +19,21 @@ import tempfile
 import uuid
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from task2_backend.database import (
+    get_agent,
+    create_agent,
+    create_session,
+    update_session,
+    add_message,
+)
+
 logger = logging.getLogger("vaaksetu.live_mic")
 router = APIRouter(prefix="/api/live", tags=["Live Microphone"])
+LIVE_MIC_AGENT_ID = "live-mic"
 
 # ─── Singleton processor (persisted across requests) ───────────────────────
 _processor = None
@@ -51,8 +61,54 @@ def _get_session(session_id: str, domain: str = "healthcare") -> dict:
             "structured_data": {},
             "speaker_map": {},
             "is_recording": True,
+            "turn_count": 0,
+            "db_ready": False,
+            "stop_requested": False,
         }
     return _sessions[session_id]
+
+
+async def _ensure_live_mic_agent(domain: str) -> dict:
+    """
+    Ensure a dedicated synthetic agent exists for live.html interactions.
+    This lets us persist live websocket sessions using the same sessions table.
+    """
+    existing = await get_agent(LIVE_MIC_AGENT_ID)
+    if existing is not None:
+        return existing
+
+    payload = {
+        "id": LIVE_MIC_AGENT_ID,
+        "name": "Live Mic Observer",
+        "domain": "Others",
+        "customDomain": f"live-{domain}",
+        "inputs": ["Voice"],
+        "fields": [],
+        "prompt": "System agent for live microphone transcript persistence.",
+        "greeting": "Live microphone recording session started.",
+        "triggers": [],
+        "escalation": {},
+        "escalation_message": "",
+        "default_language": "hi-IN",
+    }
+    return await create_agent(payload)
+
+
+async def _persist_live_session_state(session: dict, status: str):
+    """
+    Persist current live session state into DB session row.
+    """
+    if not session.get("db_ready"):
+        return
+
+    await update_session(
+        session["session_id"],
+        collected_fields=session.get("structured_data", {}),
+        is_complete=bool(session.get("structured_data")),
+        turn_count=session.get("turn_count", 0),
+        status=status,
+        ended_at=datetime.now(timezone.utc).isoformat() if status != "active" else None,
+    )
 
 
 # ─── Optional server-side ASR (best-effort, never crashes the session) ──────
@@ -228,6 +284,14 @@ async def live_mic_stream(websocket: WebSocket):
             if msg_type == "start":
                 domain = msg.get("domain", "healthcare")
                 session = _get_session(session_id, domain)
+                try:
+                    live_agent = await _ensure_live_mic_agent(domain)
+                    await create_session(session_id, live_agent["id"])
+                    session["db_ready"] = True
+                except Exception as db_err:
+                    # Keep websocket usable even if DB persistence fails
+                    logger.warning(f"[{session_id}] Failed to initialize DB session: {db_err}")
+
                 await websocket.send_text(json.dumps({
                     "type": "session_started",
                     "session_id": session_id,
@@ -249,8 +313,20 @@ async def live_mic_stream(websocket: WebSocket):
 
                 chunk_index = len(session["transcript_chunks"])
                 session["transcript_chunks"].append(text)
+                session["turn_count"] = chunk_index + 1
 
                 logger.info(f"[{session_id}] Text chunk {chunk_index}: '{text[:80]}'")
+
+                if session.get("db_ready"):
+                    try:
+                        await add_message(
+                            session_id,
+                            "user",
+                            text,
+                            turn_number=session["turn_count"],
+                        )
+                    except Exception as db_err:
+                        logger.warning(f"[{session_id}] Failed to persist chunk: {db_err}")
 
                 # Acknowledge immediately
                 await websocket.send_text(json.dumps({
@@ -315,6 +391,7 @@ async def live_mic_stream(websocket: WebSocket):
                     break
 
                 session["is_recording"] = False
+                session["stop_requested"] = True
                 logger.info(f"[{session_id}] Stop received. Generating final summary...")
 
                 # Notify client we're processing
@@ -335,6 +412,20 @@ async def live_mic_stream(websocket: WebSocket):
                     **session.get("structured_data", {}),
                     **summary.get("structured_data", {}),
                 }
+
+                if session.get("db_ready"):
+                    try:
+                        summary_text = session.get("narrative", "").strip()
+                        if summary_text:
+                            await add_message(
+                                session_id,
+                                "assistant",
+                                f"[Live Summary] {summary_text}",
+                                turn_number=session["turn_count"] + 1,
+                            )
+                        await _persist_live_session_state(session, status="completed")
+                    except Exception as db_err:
+                        logger.warning(f"[{session_id}] Failed to persist final summary: {db_err}")
 
                 await websocket.send_text(json.dumps({
                     "type": "summary_complete",
@@ -359,5 +450,11 @@ async def live_mic_stream(websocket: WebSocket):
         except Exception:
             pass
     finally:
-        # Keep session in memory for 1 hour for potential retrieval
+        if session and session.get("db_ready") and not session.get("stop_requested"):
+            try:
+                await _persist_live_session_state(session, status="paused")
+            except Exception as db_err:
+                logger.warning(f"[{session_id}] Failed to persist paused state: {db_err}")
+
+        # Keep session in memory for later retrieval
         logger.info(f"[{session_id}] Connection closed")

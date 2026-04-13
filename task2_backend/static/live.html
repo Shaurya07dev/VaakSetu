@@ -200,7 +200,7 @@
   <!-- Header -->
   <div class="hdr">
     <div class="hdr-l">
-      <div class="logo">🎙️</div>
+      <div class="logo">V</div>
       <div>
         <h1>VaakSetu — Live Call Summarisation</h1>
         <p>Multilingual real-time transcription via Sarvam ASR + AI summary</p>
@@ -232,6 +232,7 @@
 
     <button class="btn btn-go" id="btnStart" onclick="startSession()">🎤 Start Conversation</button>
     <button class="btn btn-stop" id="btnStop" onclick="stopSession()" disabled>⏹️ Stop &amp; Summarise</button>
+    <button class="btn btn-go" id="btnPdf" onclick="downloadPdf()" disabled>📄 Download PDF</button>
     <div class="timer" id="tmr">00:00</div>
   </div>
 
@@ -290,6 +291,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
 <script>
 // ═══════════════════════════════════════════════════
@@ -305,6 +307,8 @@ let ws = null, mediaRecorder = null, mediaStream = null;
 let audioCtx = null, analyser = null, vizRaf = null;
 let timerIv = null, chunkIv = null, cdIv = null;
 let startTime = null, chunkCount = 0, cdSec = 0;
+let finalSummary = null;
+let currentSessionId = null;
 
 // ═══════════════════════════════════════════════════
 // Utilities
@@ -396,6 +400,7 @@ function connectWS(domain){
 
 function handleMsg(msg){
   if(msg.type==='session_started'){
+    currentSessionId = msg.session_id;
     toast(`✅ Session ${msg.session_id} — speak now!`);
   } else if(msg.type==='transcript_ack'){
     addChunk(msg.text, msg.chunk_index);
@@ -412,6 +417,8 @@ function handleMsg(msg){
     if(msg.narrative) $('narr').textContent=msg.narrative;
     if(msg.structured_data) renderFields(msg.structured_data);
     if(msg.speaker_map) renderSpeakers(msg.speaker_map);
+    finalSummary = msg;
+    $('btnPdf').disabled = false;
     toast('🎯 Summary complete! Scroll down for extracted fields.',4500);
   } else if(msg.type==='error'){
     toast('❌ '+msg.message);
@@ -594,9 +601,100 @@ function stopSession(){
 
   $('chunkProg').classList.remove('on');
   $('btnStart').disabled=false; $('btnStop').disabled=true;
+  // Enable again only when summary is ready
+  $('btnPdf').disabled = true;
   $('domain').disabled=false; $('langSel').disabled=false;
 
   toast('⏹️ Stopped. Generating final summary...');
+}
+
+function downloadPdf(){
+  if(!finalSummary){
+    toast('⚠️ Summary not ready yet.');
+    return;
+  }
+  const jspdfRef = window.jspdf;
+  if(!jspdfRef || !jspdfRef.jsPDF){
+    toast('❌ PDF library not loaded.');
+    return;
+  }
+
+  const { jsPDF } = jspdfRef;
+  const doc = new jsPDF({unit:'pt', format:'a4'});
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 48;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const ensureSpace = (need=24) => {
+    if(y + need > pageHeight - margin){
+      doc.addPage();
+      y = margin;
+    }
+  };
+  const addTitle = (text) => {
+    ensureSpace(36);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(20);
+    doc.text(text, margin, y);
+    y += 26;
+  };
+  const addSection = (text) => {
+    ensureSpace(28);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(13);
+    doc.text(text, margin, y);
+    y += 16;
+  };
+  const addLine = (text, size=10) => {
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(String(text), contentWidth);
+    ensureSpace(lines.length * (size + 4) + 6);
+    doc.text(lines, margin, y);
+    y += lines.length * (size + 4) + 4;
+  };
+
+  addTitle('VaakSetu Live Interaction Report');
+  addLine(`Generated: ${new Date().toISOString()}`);
+  addLine(`Session ID: ${currentSessionId || 'N/A'}`);
+  addLine(`Domain: ${$('domain').value}`);
+  addLine(`Language: ${$('langSel').value}`);
+  addLine(`Captured Chunks: ${finalSummary.transcript?.length || 0}`);
+
+  addSection('Narrative Summary');
+  addLine(finalSummary.narrative || 'No narrative generated.');
+
+  addSection('Extracted Structured Fields');
+  const fields = finalSummary.structured_data || {};
+  const entries = Object.entries(fields);
+  if(entries.length === 0){
+    addLine('No structured fields extracted.');
+  } else {
+    entries.forEach(([k,v]) => addLine(`- ${k}: ${Array.isArray(v) ? v.join(', ') : String(v)}`));
+  }
+
+  addSection('Speaker Mapping');
+  const speakers = finalSummary.speaker_map || {};
+  const spEntries = Object.entries(speakers);
+  if(spEntries.length === 0){
+    addLine('No speaker mapping available.');
+  } else {
+    spEntries.forEach(([k,v]) => addLine(`- ${k}: ${v}`));
+  }
+
+  addSection('Transcript');
+  if(!finalSummary.transcript || finalSummary.transcript.length === 0){
+    addLine('No transcript captured.');
+  } else {
+    finalSummary.transcript.forEach((chunk, idx) => {
+      addLine(`[Chunk ${idx+1}] ${chunk}`);
+    });
+  }
+
+  const safeSession = (currentSessionId || 'live').replace(/[^a-zA-Z0-9-_]/g,'_');
+  doc.save(`vaaksetu_live_summary_${safeSession}.pdf`);
 }
 </script>
 </body>

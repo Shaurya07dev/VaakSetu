@@ -21,8 +21,15 @@ LANGUAGES = {
 
 # ─── Voice Personas ───────────────────────────────────────────────
 VOICES = {
+    "anushka": {
+        "speaker": "anushka",
+        "gender": "female",
+        "use_case": "Default Assistant",
+        "description": "Natural, fluent female voice tuned for multilingual conversational output",
+        "best_languages": ["hindi", "english", "kannada", "bengali", "tamil", "telugu"],
+    },
     "meera": {
-        "speaker": "ritu",
+        "speaker": "anushka",
         "gender": "female",
         "use_case": "Healthcare Assistant",
         "description": "Warm, empathetic female voice ideal for patient interactions",
@@ -43,7 +50,7 @@ VOICES = {
         "best_languages": ["hindi", "english", "marathi"],
     },
     "amruta": {
-        "speaker": "priya",
+        "speaker": "anushka",
         "gender": "female",
         "use_case": "Customer Support",
         "description": "Calm, patient female voice for support interactions",
@@ -53,7 +60,8 @@ VOICES = {
 
 # ─── Model Config ─────────────────────────────────────────────────
 DEFAULT_MODEL = "bulbul:v3"
-DEFAULT_PACE = 1.0
+DEFAULT_PACE = 0.96
+DEFAULT_VOICE = "anushka"
 MAX_CHARS_PER_REQUEST = 2500
 
 # ─── API Config ───────────────────────────────────────────────────

@@ -90,9 +90,9 @@ def quick_test(engine: SarvamTTS):
     print("⚡ Running quick test across Hindi, Kannada, English...\n")
 
     test_cases = [
-        ("hindi", "meera", SAMPLE_TEXTS["hindi"]),
-        ("kannada", "arjun", SAMPLE_TEXTS["kannada"]),
-        ("english", "meera", SAMPLE_TEXTS["english"]),
+        ("hindi", "anushka", SAMPLE_TEXTS["hindi"]),
+        ("kannada", "anushka", SAMPLE_TEXTS["kannada"]),
+        ("english", "anushka", SAMPLE_TEXTS["english"]),
     ]
 
     for lang, voice, text in test_cases:

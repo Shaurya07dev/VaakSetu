@@ -17,7 +17,6 @@ import sys
 import base64
 import time
 import requests
-import numpy as np
 
 from dotenv import load_dotenv
 
@@ -26,6 +25,7 @@ from .config import (
     VOICES,
     DEFAULT_MODEL,
     DEFAULT_PACE,
+    DEFAULT_VOICE,
     MAX_CHARS_PER_REQUEST,
     SARVAM_TTS_ENDPOINT,
 )
@@ -57,7 +57,7 @@ class SarvamTTS:
         self,
         text: str,
         language: str = "hindi",
-        speaker: str = "meera",
+        speaker: str = DEFAULT_VOICE,
         pace: float = DEFAULT_PACE,
         audio_format: str = "wav",
     ) -> bytes:
@@ -82,10 +82,13 @@ class SarvamTTS:
                 f"❌ Unknown language '{language}'. Available: {available}"
             )
 
-        # Resolve speaker
-        speaker_name = speaker.lower()
+        # Resolve speaker (fallback to default female voice for natural output)
+        speaker_name = (speaker or DEFAULT_VOICE).lower()
         if speaker_name in VOICES:
             speaker_name = VOICES[speaker_name]["speaker"]
+        else:
+            print(f"⚠️ Unknown voice '{speaker}'. Falling back to '{DEFAULT_VOICE}'.")
+            speaker_name = VOICES[DEFAULT_VOICE]["speaker"]
 
         # Handle long text by chunking
         if len(text) > MAX_CHARS_PER_REQUEST:
@@ -95,11 +98,16 @@ class SarvamTTS:
 
         # Build request payload
         payload = {
-            "text": text,
+            # Sarvam cookbook examples use `inputs=[text]` and preprocessing for better fluency.
+            "inputs": [text],
             "target_language_code": lang_code,
             "speaker": speaker_name,
             "model": self.model,
             "pace": pace,
+            "pitch": 0,
+            "loudness": 1.1,
+            "speech_sample_rate": 22050,
+            "enable_preprocessing": True,
         }
 
         # Make API call with retry
@@ -156,11 +164,15 @@ class SarvamTTS:
         for i, chunk in enumerate(chunks, 1):
             print(f"   🔊 Processing chunk {i}/{len(chunks)}...")
             payload = {
-                "text": chunk,
+                "inputs": [chunk],
                 "target_language_code": lang_code,
                 "speaker": speaker,
                 "model": self.model,
                 "pace": pace,
+                "pitch": 0,
+                "loudness": 1.1,
+                "speech_sample_rate": 22050,
+                "enable_preprocessing": True,
             }
             audio_bytes = self._api_call_with_retry(payload)
             all_audio += audio_bytes
@@ -207,7 +219,7 @@ class SarvamTTS:
         self,
         text: str,
         language: str = "hindi",
-        speaker: str = "meera",
+        speaker: str = DEFAULT_VOICE,
         pace: float = DEFAULT_PACE,
     ) -> None:
         """
@@ -248,7 +260,7 @@ class SarvamTTS:
         self,
         text: str,
         language: str = "hindi",
-        speaker: str = "meera",
+        speaker: str = DEFAULT_VOICE,
         filepath: str = "output/tts_output.wav",
         pace: float = DEFAULT_PACE,
     ) -> str:
