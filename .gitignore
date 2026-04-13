@@ -28,7 +28,7 @@ venv/
 ENV/
 
 # Environment Variables
-# .env
+.env
 .env.example
 
 # IDEs
