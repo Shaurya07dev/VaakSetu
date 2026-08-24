@@ -28,6 +28,7 @@ from task1_ai_core.config import (
     SARVAM_STT_MODEL,
     SARVAM_STT_MODE,
 )
+from task1_ai_core.audio_utils import configure_audio_binaries
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +238,7 @@ class ASRPipeline:
 
         # Convert using pydub
         try:
+            configure_audio_binaries()
             from pydub import AudioSegment
 
             audio = AudioSegment.from_file(audio_path)

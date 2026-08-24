@@ -1,0 +1,30 @@
+INFO:     Started server process [33788]
+INFO:     Waiting for application startup.
+13:47:40 | INFO    | vaaksetu.backend | ============================================================
+13:47:40 | INFO    | vaaksetu.backend | VaakSetu Backend — Starting up...
+13:47:40 | INFO    | vaaksetu.backend | ============================================================
+13:47:40 | INFO    | vaaksetu.database | Database initialized at C:\Users\shaur\OneDrive\Documents\iiitD\vaaksetu.db
+13:47:40 | INFO    | vaaksetu.backend | \u2713 Database initialized (SQLite)
+13:47:40 | INFO    | vaaksetu.backend | \u2713 Domain configs loaded (financial, healthcare)
+13:47:40 | INFO    | vaaksetu.backend | \u2713 Twilio config validated
+13:47:40 | INFO    | vaaksetu.backend | \u2713 Live Conversation UI at http://localhost:8000/live
+13:47:40 | INFO    | vaaksetu.backend | \u2713 Backend ready on http://localhost:8000
+13:47:40 | INFO    | vaaksetu.backend | ============================================================
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+13:47:57 | INFO    | vaaksetu.tts | Language auto-detected: en -> changing DEFAULT_LANGUAGE from None to en-IN
+13:47:57 | INFO    | vaaksetu.tts | TTS synthesising 36 chars in en-IN (speaker=hitesh)
+13:47:59 | INFO    | httpx | HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"
+13:47:59 | INFO    | vaaksetu.tts | TTS OK — 95788 bytes
+13:47:59 | INFO    | vaaksetu.tts | TTS b64 length: 127720
+13:47:59 | INFO    | vaaksetu.routes.sessions | Session started: s-258e1d23 for agent 4232e541
+13:48:51 | INFO    | task1_ai_core.agent | LLM initialized: sarvam-30b @ https://api.sarvam.ai/v1
+13:48:58 | INFO    | httpx | HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+13:49:00 | INFO    | httpx | HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+13:49:00 | WARNING | task1_ai_core.smart_extractor | No JSON found in extraction response: 
+13:49:00 | INFO    | task1_ai_core.smart_extractor | Heuristic fallback extracted fields: ['symptoms', 'medications', 'duration']
+13:49:00 | INFO    | vaaksetu.tts | TTS synthesising 139 chars in en-IN (speaker=hitesh)
+13:49:01 | INFO    | httpx | HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"
+13:49:02 | INFO    | vaaksetu.tts | TTS OK — 355884 bytes
+13:49:02 | INFO    | vaaksetu.tts | TTS b64 length: 474512
+13:49:02 | INFO    | vaaksetu.routes.sessions | Session s-258e1d23 turn 1: collected=['symptoms', 'duration'], complete=False

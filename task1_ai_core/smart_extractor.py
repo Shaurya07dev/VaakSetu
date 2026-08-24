@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Any
 
 from task1_ai_core.config import (
@@ -139,12 +140,96 @@ If nothing is extractable, return: {{}}"""
 
             if valid_extracted:
                 logger.info(f"Extracted fields: {list(valid_extracted.keys())}")
+                return valid_extracted
 
-            return valid_extracted
+            heuristic = self._heuristic_extract_fields(user_message, missing_fields)
+            if heuristic:
+                logger.info(f"Heuristic fallback extracted fields: {list(heuristic.keys())}")
+            return heuristic
 
         except json.JSONDecodeError as e:
             logger.warning(f"JSON parse error in extraction: {e}")
-            return {}
+            return self._heuristic_extract_fields(user_message, missing_fields)
         except Exception as e:
             logger.warning(f"Smart extraction failed: {e}. Returning empty.")
-            return {}
+            return self._heuristic_extract_fields(user_message, missing_fields)
+
+    def _heuristic_extract_fields(
+        self,
+        user_message: str,
+        missing_fields: list[str],
+    ) -> dict[str, Any]:
+        text = user_message.strip()
+        lower = text.lower()
+        extracted: dict[str, Any] = {}
+
+        duration_match = re.search(
+            r"\bfor\s+([a-z0-9 -]+?\s(?:hours?|days?|weeks?|months?|years?))\b",
+            lower,
+        )
+        duration_value = duration_match.group(1).strip() if duration_match else None
+
+        symptom_match = re.search(
+            r"\b(?:have|having|had|suffering from|experiencing)\s+([a-z0-9 ,/-]+?)(?:\s+for\s+[a-z0-9 -]+?\s(?:hours?|days?|weeks?|months?|years?)|[.!?,]|$)",
+            lower,
+        )
+        symptom_value = symptom_match.group(1).strip(" ,.-") if symptom_match else None
+
+        med_match = re.search(
+            r"\b(?:taking|on)\s+([a-z0-9 ,/-]+?)(?:\s+(?:right now|currently|today)|[.!?,]|$)",
+            lower,
+        )
+        name_match = re.search(
+            r"\b(?:my name is|i am|i'm)\s+([a-z]+(?:\s+[a-z]+){0,3})\b",
+            lower,
+        )
+        age_match = re.search(r"\b(\d{1,3})\s*(?:years?\s*old|yrs?\s*old|yo\b)?", lower)
+        budget_match = re.search(r"\b(?:rs\.?|inr|\$)\s*([0-9][0-9,]*)\b", lower)
+        timeline_match = re.search(
+            r"\b(?:within|in|after)\s+([a-z0-9 -]+?\s(?:days?|weeks?|months?|years?))\b",
+            lower,
+        )
+        interest_match = re.search(r"\binterested in\s+([a-z0-9 ,/-]+?)(?:[.!?,]|$)", lower)
+
+        for field in missing_fields:
+            field_lower = field.lower()
+
+            if field_lower.endswith("name") and name_match:
+                extracted[field] = name_match.group(1).strip().title()
+            elif "age" in field_lower and age_match:
+                extracted[field] = age_match.group(1)
+            elif "gender" in field_lower or field_lower.endswith("sex"):
+                if "female" in lower or "woman" in lower:
+                    extracted[field] = "female"
+                elif "male" in lower or "man" in lower:
+                    extracted[field] = "male"
+            elif "symptom" in field_lower or "complaint" in field_lower:
+                if symptom_value:
+                    extracted[field] = symptom_value
+            elif "duration" in field_lower or "timeline" == field_lower:
+                if duration_value:
+                    extracted[field] = duration_value
+            elif "medication" in field_lower or "medicine" in field_lower:
+                if any(phrase in lower for phrase in [
+                    "not taking any medication",
+                    "not taking medication",
+                    "no medication",
+                    "no medicines",
+                    "not on any medication",
+                ]):
+                    extracted[field] = "__NULL__"
+                elif med_match:
+                    extracted[field] = med_match.group(1).strip(" ,.-")
+            elif "history" in field_lower:
+                if "first time" in lower:
+                    extracted[field] = "first time"
+                elif "before" in lower or "previous" in lower or "history" in lower:
+                    extracted[field] = text
+            elif "budget" in field_lower and budget_match:
+                extracted[field] = budget_match.group(1).replace(",", "")
+            elif "timeline" in field_lower and timeline_match:
+                extracted[field] = timeline_match.group(1).strip()
+            elif "interest" in field_lower and interest_match:
+                extracted[field] = interest_match.group(1).strip(" ,.-")
+
+        return extracted

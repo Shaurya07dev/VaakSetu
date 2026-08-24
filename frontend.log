@@ -1,0 +1,22 @@
+
+> task3_frontend@0.1.0 dev
+> next dev --port 3000
+
+▲ Next.js 16.2.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.18:3000
+✓ Ready in 1213ms
+Creating turbopack project {
+  dir: 'C:\\Users\\shaur\\OneDrive\\Documents\\iiitD\\frontend',
+  testMode: true
+}
+
+ GET / 200 in 1914ms (next.js: 783ms, application-code: 1131ms)
+ GET / 200 in 201ms (next.js: 15ms, application-code: 187ms)
+ GET / 200 in 611ms (next.js: 160ms, application-code: 450ms)
+ GET / 200 in 350ms (next.js: 13ms, application-code: 336ms)
+ GET / 200 in 274ms (next.js: 15ms, application-code: 259ms)
+ GET / 200 in 276ms (next.js: 88ms, application-code: 188ms)
+ GET / 200 in 278ms (next.js: 195ms, application-code: 83ms)
+ GET /healthcare 200 in 403ms (next.js: 94ms, application-code: 310ms)
+ GET /banking 200 in 1805ms (next.js: 1659ms, application-code: 145ms)

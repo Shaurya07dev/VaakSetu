@@ -30,6 +30,7 @@ from task2_backend.database import (
     update_session,
     add_message,
 )
+from task1_ai_core.audio_utils import configure_audio_binaries
 
 logger = logging.getLogger("vaaksetu.live_mic")
 router = APIRouter(prefix="/api/live", tags=["Live Microphone"])
@@ -130,7 +131,8 @@ async def _try_server_asr(audio_bytes: bytes, audio_format: str = "webm") -> Opt
             tmp.write(audio_bytes)
             tmp_path = tmp.name
 
-        # Convert to 16kHz WAV using pydub (requires ffmpeg)
+        # Convert to 16kHz WAV using pydub.
+        configure_audio_binaries()
         from pydub import AudioSegment
         audio = AudioSegment.from_file(tmp_path)
         audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)

@@ -1,0 +1,44 @@
+[browser] ./src/app/(dashboard)/healthcare/page.js:7:1
+Module not found: Can't resolve '@/data/healthcareUseCase'
+   5 | import Navbar from "@/components/Navbar";
+   6 | import ScrollReveal from "@/components/ScrollReveal";
+>  7 | import { healthcareUseCase } from "@/data/healthcareUseCase";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | const fadeUp = {
+  10 |   initial: { opacity: 0, y: 30, filter: "blur(10px)" },
+
+Import map: aliased to relative './src/data/healthcareUseCase' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./src/app/(dashboard)/healthcare/page.js [Client Component Browser]
+    ./src/app/(dashboard)/healthcare/page.js [Server Component]
+
+  Client Component SSR:
+    ./src/app/(dashboard)/healthcare/page.js [Client Component SSR]
+    ./src/app/(dashboard)/healthcare/page.js [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./src/app/(dashboard)/healthcare/page.js:7:1
+Module not found: Can't resolve '@/data/healthcareUseCase'
+   5 | import Navbar from "@/components/Navbar";
+   6 | import ScrollReveal from "@/components/ScrollReveal";
+>  7 | import { healthcareUseCase } from "@/data/healthcareUseCase";
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   8 |
+   9 | const fadeUp = {
+  10 |   initial: { opacity: 0, y: 30, filter: "blur(10px)" },
+
+Import map: aliased to relative './src/data/healthcareUseCase' inside of [project]/
+
+Import traces:
+  Client Component Browser:
+    ./src/app/(dashboard)/healthcare/page.js [Client Component Browser]
+    ./src/app/(dashboard)/healthcare/page.js [Server Component]
+
+  Client Component SSR:
+    ./src/app/(dashboard)/healthcare/page.js [Client Component SSR]
+    ./src/app/(dashboard)/healthcare/page.js [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
